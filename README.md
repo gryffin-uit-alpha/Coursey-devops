@@ -13,16 +13,18 @@
 
 ### Prerequisites
 
-* Clone the repository: `git clone https://github.com/Ly-Lynn/Coursey`
+* Clone the repository: `git clone https://github.com/Ly-Lynn/Coursey` i created fork from this repository
+* The newest version is in my repository, you can clone it here: `git clone https://github.com/gryffin-uit-alpha/Coursey`
 
 ### Frontend
 
 #### Setup and Launch
 
 1. Navigate to the frontend directory: `cd front-end`
-2. Run the command to start the frontend: `npm start --build`
-3. Access the User Interface at: `http://localhost:3000`
-4. Access the Admin Panel at: `http://localhost:8082`
+2. Run the command to install dependencies: `npm install`
+3. Run the command to start the frontend: `npm start `
+4. Access the User Interface at: `http://localhost:3000`
+5. Access the Admin Panel at: `http://localhost:8082`
 
 **Important:** The Admin password is located in `back-end/.env/.env`. Please ensure to keep this information secure.
 
@@ -31,7 +33,7 @@
 #### Setup and Launch
 
 1. Navigate to the backend directory: `cd back-end`
-2. Run the command to start the backend: `docker-compose up --build`
+2. Run the command to start the backend: `docker compose up --build`
 
 ### Database
 
