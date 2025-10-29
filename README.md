@@ -37,8 +37,10 @@
 
 #### Access and Configuration
 
-1. Access the SQL admin at: `http://localhost:8081`
-2. Import the database schema from `back-end/sql/docker-php_export.sql` using the SQL command interface.
+1. Import the database schema from `back-end/sql/docker-php_export.sql` using the SQL command interface. Make sure you are in root folder of the project.
+```sh
+docker exec -i back-end-db-1 mysql -u root -pgryffin0811 docker-php < back-end/sql/docker-php_export.sql
+```
 
 ## Contributing
 ------------
