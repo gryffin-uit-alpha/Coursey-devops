@@ -63,14 +63,10 @@ Navigate to ```back-end\sql\docker-php_export.sql``` and import it into the SQL 
 ```sh
 username: lynn
 password: 12345
-```
-- User Account:
-```sh
-username: lynn_nekk
-password: Linh040202@
+
 ```
 - Database Account:
 ```sh
-username: khoatn
-password: khoa
+username: gryffin0811
+password: gryffin0811
 ```

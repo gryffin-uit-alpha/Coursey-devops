@@ -302,7 +302,7 @@ ALTER TABLE `Lecturers`
 --
 ALTER TABLE `UserCourses`
   ADD PRIMARY KEY (`user_id`,`course_id`),
-  ADD KEY `course_id` (`course_id`),
+  ADD KEY `course_id` (`course_id`);
 --
 -- Indexes for table `Users`
 --
