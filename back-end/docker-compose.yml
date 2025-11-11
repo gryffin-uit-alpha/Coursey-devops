@@ -1,9 +1,7 @@
 services:
   # nginx
   web:
-    build:
-      context: .
-      dockerfile: nginx/Dockerfile
+    image: gryffin0109/courseyproject:nginx
     ports:
       - "8080:80"
       - "8082:8082"
@@ -11,9 +9,7 @@ services:
       - app
 
   app:
-    build:
-      context: .
-      dockerfile: php/Dockerfile
+    image: gryffin0109/courseyproject:php
     depends_on:
       - db
 
@@ -37,9 +33,7 @@ services:
       - db
 
   python:
-    build:
-      context: .
-      dockerfile: python/Dockerfile
+    image: gryffin0109/courseyproject:python
     ports:
       - "8002:8002"
 
