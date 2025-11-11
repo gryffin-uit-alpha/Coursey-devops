@@ -21,7 +21,11 @@ COPY php/conf.d/xdebug.ini /usr/local/etc/php/
 COPY --from=composer /app/vendor /var/www/html/vendor
 
 # Copy application source code
-COPY ./app /app
+COPY app /app
+
+# Create .env directory and copy .env file
+RUN mkdir -p /app/.env
+COPY .env/.env /app/.env/.env
 
 # Set working directory
 WORKDIR /var/www/html
