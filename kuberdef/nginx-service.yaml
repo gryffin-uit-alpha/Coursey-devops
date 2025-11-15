@@ -1,24 +1,15 @@
-# Nginx Service
-# This service exposes the Nginx deployment to external traffic
-# It provides access to both main app (port 80) and admin panel (port 8082)
 apiVersion: v1
 kind: Service
 metadata:
   name: nginx-service
-  labels:
-    app: coursey-nginx
 spec:
   selector:
-    app: coursey-nginx  # Routes traffic to Nginx deployment pods
+    app: coursey-nginx
   ports:
-  - port: 80           # External port for main application
-    targetPort: 80     # Container port where nginx serves main app
-    protocol: TCP
-    name: http
-  - port: 8082         # External port for admin panel
-    targetPort: 8082   # Container port where nginx serves admin panel
-    protocol: TCP
-    name: admin
-  type: LoadBalancer   # Exposes service externally with external IP
-  # Alternative: Use NodePort if LoadBalancer is not available
-  # type: NodePort
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: admin
+      port: 8082
+      targetPort: 8082
+  type: ClusterIP

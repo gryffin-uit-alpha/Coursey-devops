@@ -23,17 +23,15 @@ spec:
         ports:
         - containerPort: 8002  # Python application port
           name: python-http
-
-        # Health check to ensure Python app is responding
+        
+        # Use TCP health checks to avoid 404 errors
         readinessProbe:
-          httpGet:
-            path: /
+          tcpSocket:
             port: 8002
           initialDelaySeconds: 10
           periodSeconds: 5
         livenessProbe:
-          httpGet:
-            path: /
+          tcpSocket:
             port: 8002
           initialDelaySeconds: 20
           periodSeconds: 10

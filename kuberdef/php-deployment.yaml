@@ -56,6 +56,11 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: PASS_APP
+        - name: HOST_NAME
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: HOST_NAME
         # Health check to ensure PHP-FPM is ready
         readinessProbe:
           tcpSocket:

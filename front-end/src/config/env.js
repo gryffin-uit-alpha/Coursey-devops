@@ -3,10 +3,10 @@ const environment = process.env.NODE_ENV || 'development';
 
 const ENV = {
   development: {
-    hostName: process.env.REACT_APP_API_URL || 'http://localhost:8080/',
+    hostName: process.env.REACT_APP_API_URL,
   },
   production: {
-    hostName: process.env.REACT_APP_API_URL || 'https://api.myapp.com/',
+    hostName: process.env.REACT_APP_API_URL,
   }
 };
 

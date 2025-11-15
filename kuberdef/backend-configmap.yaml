@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: coursey-backend
+data:
+  API_BASE_URL: "https://api.gryffin-uit.site"
+  api-config.js: |
+    window.API_BASE_URL = 'https://api.gryffin-uit.site';

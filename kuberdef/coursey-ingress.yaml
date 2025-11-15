@@ -1,6 +1,3 @@
-# Coursey Application Ingress
-# This ingress provides a single entry point for all external traffic
-# It routes requests to appropriate services based on URL paths
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,45 +5,33 @@ metadata:
   labels:
     app: coursey
   annotations:
-    # Enable URL rewriting and path-based routing
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    # Handle CORS for API requests
     nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
-  # Define routing rules for different paths
+  ingressClassName: nginx
   rules:
-  - host: localhost  # Change to your domain in production
+
+  # ---------------- API -----------------
+  - host: api.gryffin-uit.site
     http:
       paths:
-      # Main application - routes to Nginx service port 80
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80
+
+  # ---------------- ADMIN PANEL -----------------
+  - host: admin.gryffin-uit.site
+    http:
+      paths:
       - path: /
         pathType: Prefix
         backend:
           service:
             name: nginx-service
             port:
-              number: 80
-      # Admin panel - routes to Nginx service port 8082
-      - path: /admin
-        pathType: Prefix
-        backend:
-          service:
-            name: nginx-service
-            port:
               number: 8082
-      # API endpoints - routes directly to PHP service
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: php-service
-            port:
-              number: 9000
-      # Python admin backend - routes to Python service
-      - path: /python
-        pathType: Prefix
-        backend:
-          service:
-            name: python-service
-            port:
-              number: 8002
