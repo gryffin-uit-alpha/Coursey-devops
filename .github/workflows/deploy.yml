@@ -127,5 +127,5 @@ jobs:
             IMAGE_NAME: ${{ env.ECR_REPOSITORY_MYSQL }}
             IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
           run: |
-              docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG -f back-end/mysql/Dockerfile ./back-end/mysql
+              docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG -f back-end/mysql/Dockerfile ./back-end
               docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
