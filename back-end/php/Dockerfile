@@ -25,9 +25,9 @@ COPY app /app
 
 # Create .env directory and copy .env file
 RUN mkdir -p /app/.env
+RUN docker-php-ext-install mysqli
 COPY .env/.env /app/.env/.env
 
-# Set working directory
 WORKDIR /var/www/html
 
 # Expose port

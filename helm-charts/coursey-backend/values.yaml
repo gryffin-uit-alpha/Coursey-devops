@@ -1,0 +1,85 @@
+secrets:
+  mysqlHost: "coursey-database-service"
+  mysqlRootPassword: "gryffin0811"
+  mysqlUser: "gryffin0811"
+  mysqlDatabase: "docker-php"
+  mysqlPassword: "gryffin0811"
+  pmaHost: "db"
+  hostName: "gryffin-uit.site"
+  mailUsername: "khoatn@tensoract.io"
+  passApp: "uobo eiam ijmi clzy"
+
+python:
+  replicaCount: 1
+  image:
+    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/python
+    tag: "latest"
+  service:
+    port: 8002
+
+php:
+  replicaCount: 2
+  image:
+    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/php
+    tag: "latest"
+  service:
+    port: 9000
+
+nginx:
+  replicaCount: 1
+  image:
+    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/nginx
+    tag: "latest"
+  service:
+    ports:
+      - name: http
+        containerPort: 80
+        servicePort: 80
+      - name: admin
+        containerPort: 8082
+        servicePort: 8082
+
+mysql:
+  replicaCount: 1
+  image:
+    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/mysql
+    tag: "latest"
+  service:
+    port: 3306
+  persistence:
+    enabled: true
+    size: 3Gi
+    storageClass: "gp3"
+
+appConfig:
+  apiBaseUrl: "https://api.gryffin-uit.site"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - name: "api"
+      host: "api.gryffin-uit.site"
+      serviceName: "nginx-service"
+      port: 80
+      #  API need CORS
+      annotations:
+        nginx.ingress.kubernetes.io/enable-cors: "true"
+
+    - name: "admin"
+      host: "admin.gryffin-uit.site"
+      serviceName: "nginx-service"
+      port: 8082
+
+      annotations: {}
+
+storageClass:
+  create: true
+  name: gp3
+  isDefault: true
+  provisioner: ebs.csi.aws.com
+  reclaimPolicy: Delete
+  volumeBindingMode: WaitForFirstConsumer
+  parameters:
+    type: gp3
+    fsType: ext4

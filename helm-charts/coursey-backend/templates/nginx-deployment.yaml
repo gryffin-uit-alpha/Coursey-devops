@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coursey-nginx
+  labels:
+    app: coursey-nginx
+spec:
+  replicas: {{ .Values.nginx.replicaCount }}
+  selector:
+    matchLabels:
+      app: coursey-nginx
+  template:
+    metadata:
+      labels:
+        app: coursey-nginx
+    spec:
+      containers:
+      - name: nginx
+        image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
+        imagePullPolicy: Always
+        ports:
+        {{- range .Values.nginx.service.ports }}
+        - name: {{ .name }}
+          containerPort: {{ .containerPort }}
+        {{- end }}

@@ -1,0 +1,28 @@
+{{- if .Values.ingress.enabled -}}
+{{- range .Values.ingress.hosts }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: coursey-{{ .name }}-ingress
+  labels:
+    app: coursey-backend
+  annotations:
+    {{- with .annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  rules:
+  - host: {{ .host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .serviceName }}
+            port:
+              number: {{ .port }}
+{{- end }}
+{{- end }}
