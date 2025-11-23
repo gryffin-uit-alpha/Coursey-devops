@@ -26,6 +26,10 @@ WORKDIR /app
 # Copy application code
 COPY python/adminpanel/ .
 
+# Create cookies directory and copy cookies file
+RUN mkdir -p /app/cookies
+COPY python/cookies.txt /app/cookies/youtube_cookies.txt
+
 # Expose port
 EXPOSE 8002
 

@@ -21,7 +21,8 @@ spec:
         ports:
         - containerPort: {{ .Values.python.service.port }}
           name: python-http
-        
+        resources:
+          {{- toYaml .Values.python.resources | nindent 10 }}
         readinessProbe:
           tcpSocket:
             port: {{ .Values.python.service.port }}

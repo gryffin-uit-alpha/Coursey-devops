@@ -48,6 +48,9 @@ spec:
         volumeMounts:
         - name: mysql-storage
           mountPath: /var/lib/mysql
+        
+        resources:
+          {{- toYaml .Values.mysql.resources | nindent 10 }}
       
       volumes:
       - name: mysql-storage

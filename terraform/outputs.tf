@@ -8,7 +8,4 @@ output "configure_kubectl" {
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${var.cluster_name}"
 }
 
-output "load_balancer_hostname" {
-  description = "Load Balancer endpoint"
-  value       = try(data.kubernetes_service.ingress_nginx.status.0.load_balancer.0.ingress.0.hostname, "Đang chờ tạo...")
-}
+

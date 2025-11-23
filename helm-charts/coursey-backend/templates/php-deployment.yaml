@@ -59,7 +59,8 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: HOST_NAME
-
+        resources:
+          {{- toYaml .Values.php.resources | nindent 10 }}
         readinessProbe:
           tcpSocket:
             port: {{ .Values.php.service.port }}
