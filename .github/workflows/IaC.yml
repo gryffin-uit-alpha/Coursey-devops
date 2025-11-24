@@ -5,11 +5,13 @@ on:
     branches: ["main"]
     paths:
       - "terraform/**"
+      - ".github/workflows/IaC.yml"
 
   push:
     branches: ["main"]
     paths:
       - "terraform/**"
+      - ".github/workflows/IaC.yml"
 
   workflow_dispatch:
 
