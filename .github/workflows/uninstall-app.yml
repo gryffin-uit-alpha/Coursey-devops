@@ -1,0 +1,37 @@
+name: Uninstall Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_action:
+        description: 'Type "UNINSTALL" to confirm uninstallation'
+        required: true
+        default: ""
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: gryffin-eks-cluster
+
+jobs:
+  uninstall-helm:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm_action == 'UNINSTALL' }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Uninstall Helm Release
+        run: |
+          echo "Deleting coursey application..."
+          helm uninstall coursey --namespace default
+
+          echo "Waiting for Load Balancer cleanup..."
+          sleep 30
