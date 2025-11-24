@@ -1,6 +1,6 @@
 secrets:
   mysqlHost: "coursey-database-service"
-  mysqlRootPassword: "gryffin0811" # NÊN ĐỔI
+  mysqlRootPassword: "gryffin0811" # CHANGE IT
   mysqlUser: "gryffin0811"
   mysqlDatabase: "docker-php"
   mysqlPassword: "gryffin0811"
@@ -18,11 +18,11 @@ python:
     port: 8002
   resources:
     requests:
-      memory: "80Mi" # Dư ra một chút so với thực tế
-      cpu: "50m"
+      memory: "256Mi"
+      cpu: "100m"
     limits:
-      memory: "256Mi" # Cho phép tăng gấp 3 khi xử lý nặng
-      cpu: "500m"
+      memory: "1Gi"
+      cpu: "1000m"
 
 php:
   replicaCount: 2
@@ -33,11 +33,11 @@ php:
     port: 9000
   resources:
     requests:
-      memory: "64Mi" # Đặt mức sàn cao hơn thực tế idle để an toàn
-      cpu: "50m"
+      memory: "256Mi"
+      cpu: "100m"
     limits:
-      memory: "256Mi" # Giới hạn an toàn
-      cpu: "500m"
+      memory: "1Gi"
+      cpu: "1000m"
 
 nginx:
   replicaCount: 1
@@ -45,7 +45,7 @@ nginx:
     repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/nginx
     tag: "latest"
   service:
-    # ALB target-type: ip yêu cầu service có thể reach được, ClusterIP là chuẩn.
+    # ALB target-type
     type: ClusterIP
     ports:
       - name: http
@@ -56,11 +56,11 @@ nginx:
         servicePort: 8082
   resources:
     requests:
-      memory: "20Mi"
-      cpu: "20m"
-    limits:
       memory: "64Mi"
-      cpu: "200m"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
 
 mysql:
   replicaCount: 1
@@ -71,15 +71,15 @@ mysql:
     port: 3306
   persistence:
     enabled: true
-    size: 3Gi
+    size: 8Gi
     storageClass: "gp3"
   resources:
     requests:
-      memory: "450Mi" # Cam kết cho DB 450MB
-      cpu: "100m" # 0.1 Core
+      memory: "1Gi"
+      cpu: "500m"
     limits:
-      memory: "768Mi" # Tối đa 768MB (Tránh MySQL ăn hết RAM của Node)
-      cpu: "1000m" # Tối đa 1 Core
+      memory: "2Gi"
+      cpu: "2000m"
 
 appConfig:
   apiBaseUrl: "https://api.gryffin-uit.site"
