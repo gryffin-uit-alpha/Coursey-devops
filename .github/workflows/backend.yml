@@ -81,10 +81,8 @@ jobs:
           IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
           DOCKERFILE_PATH: ${{ matrix.service.dockerfile }}
         run: |
-          # Build Image với Tag SHA và Tag Latest
           docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest -f $DOCKERFILE_PATH ./back-end
 
-          # Push lên ECR
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO:latest
 
@@ -116,7 +114,6 @@ jobs:
         run: |
           echo "Deploying version: $TAG"
 
-          # Lệnh này sẽ ghi đè image tag trong values.yaml bằng tag mới build
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
             --set php.image.tag=$TAG \

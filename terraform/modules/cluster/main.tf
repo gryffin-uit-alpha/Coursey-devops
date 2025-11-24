@@ -3,10 +3,10 @@ module "eks" {
   version = "19.15.3"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.30"
+  cluster_version = var.cluster_version
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = var.vpc_id
+  subnet_ids = var.subnet_ids
 
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
@@ -26,13 +26,14 @@ module "eks" {
       most_recent = true
     }
   }
+
   eks_managed_node_groups = {
     worker_m7i = {
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
+      min_size     = var.node_group_min_size
+      max_size     = var.node_group_max_size
+      desired_size = var.node_group_desired_size
 
-      instance_types = ["m7i-flex.large"]
+      instance_types = var.node_instance_types
       capacity_type  = "ON_DEMAND"
       ami_type       = "AL2023_x86_64_STANDARD"
 
