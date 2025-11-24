@@ -6,20 +6,17 @@ metadata:
     app: coursey-nginx
 data:
   default.conf: |
-    # Server Block cho API/Frontend (Port 80)
     server {
         listen 80;
         server_name _;
-        root /app/public; # Đảm bảo path này đúng với image PHP code của bạn
+        root /app/public;
         index index.php;
 
-        # Health Check cho ALB
         location /healthz {
             access_log off;
             return 200 "OK";
         }
 
-        # Cấu hình CORS (Vì ALB không hỗ trợ annotation)
         location / {
             if ($request_method = 'OPTIONS') {
                 add_header 'Access-Control-Allow-Origin' '*';
@@ -37,7 +34,6 @@ data:
             try_files $uri $uri/ /index.php?$query_string;
         }
 
-        # Chuyển xử lý PHP sang container PHP (qua Service)
         location ~ \.php$ {
             fastcgi_pass php-service:9000;
             fastcgi_index index.php;
@@ -46,7 +42,6 @@ data:
         }
     }
 
-    # Server Block cho Admin (Port 8082)
     server {
         listen 8082;
         server_name _;

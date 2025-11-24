@@ -1,0 +1,127 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "back-end/**"
+      - "helm-charts/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: gryffin-eks-cluster
+
+  ECR_REPO_PHP: coursey/php
+  ECR_REPO_PYTHON: coursey/python
+  ECR_REPO_NGINX: coursey/nginx
+  ECR_REPO_MYSQL: coursey/mysql
+
+jobs:
+  sonar-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # - name: Quality Gate
+      #   uses: SonarSource/sonarqube-quality-gate-action@master
+      #   timeout-minutes: 5
+      #   env: { SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} }
+
+  build-push:
+    needs: sonar-scan
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.define_tag.outputs.tag }} # Tag for deloyment
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: php
+            repo: coursey/php
+            dockerfile: back-end/php/Dockerfile
+          - name: python
+            repo: coursey/python
+            dockerfile: back-end/python/Dockerfile
+          - name: nginx
+            repo: coursey/nginx
+            dockerfile: back-end/nginx/Dockerfile
+          - name: mysql
+            repo: coursey/mysql
+            dockerfile: back-end/mysql/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Define Image Tag (Short SHA)
+        id: define_tag
+        run: echo "tag=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_OUTPUT
+
+      - name: Build & Push ${{ matrix.service.name }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO: ${{ matrix.service.repo }}
+          IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
+          DOCKERFILE_PATH: ${{ matrix.service.dockerfile }}
+        run: |
+          # Build Image với Tag SHA và Tag Latest
+          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest -f $DOCKERFILE_PATH ./back-end
+
+          # Push lên ECR
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO:latest
+
+  # DEPLOY TO EKS
+  deploy-eks:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+
+      - name: Update Kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy with Helm
+        env:
+          TAG: ${{ needs.build-push.outputs.image_tag }}
+        run: |
+          echo "Deploying version: $TAG"
+
+          # Lệnh này sẽ ghi đè image tag trong values.yaml bằng tag mới build
+          helm upgrade --install coursey ./helm-charts/coursey-backend/ \
+            --namespace default \
+            --set php.image.tag=$TAG \
+            --set python.image.tag=$TAG \
+            --set nginx.image.tag=$TAG \
+            --set mysql.image.tag=$TAG \
+            --timeout 5m \
+            --wait
