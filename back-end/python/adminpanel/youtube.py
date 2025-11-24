@@ -124,9 +124,9 @@ class YoububeDownloader:
                 video_id = video.get("id", "")
             video_urls.append(video_id)
         
-        durations = [video.get("duration", 0) / 3600 for video in videos if video is not None]
+        durations = [(video.get("duration") or 0) / 3600 for video in videos if video is not None]
         total_times = sum(durations)
-        view_count = max([video.get("view_count", 0) for video in videos if video is not None], default=0)
+        view_count = max([video.get("view_count") or 0 for video in videos if video is not None], default=0)
         titles = [video.get("title", "No title") for video in videos if video is not None]
                 
         results = {
