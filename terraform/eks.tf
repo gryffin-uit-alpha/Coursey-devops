@@ -27,13 +27,14 @@ module "eks" {
     }
   }
   eks_managed_node_groups = {
-    worker_small = {
-      min_size     = 2
-      max_size     = 4
-      desired_size = 3
+    worker_m7i = {
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
 
-      instance_types = ["t3.small"]
+      instance_types = ["m7i-flex.large"]
       capacity_type  = "ON_DEMAND"
+      ami_type       = "AL2023_x86_64_STANDARD"
 
       iam_role_additional_policies = {
         AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
