@@ -14,8 +14,28 @@ env:
   S3_BUCKET_NAME: coursey-project
 
 jobs:
+  sonar-scan:
+    name: SonarQube Frontend Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full git history for SonarQube analysis
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dproject.settings=sonar-frontend.properties
+
   deploy-frontend:
     name: Build & Sync to S3
+    needs: sonar-scan
     runs-on: ubuntu-latest
 
     steps:
