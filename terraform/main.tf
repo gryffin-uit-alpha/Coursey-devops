@@ -1,7 +1,3 @@
-# ===================================
-# Root Main Configuration
-# This file orchestrates all modules
-# ===================================
 
 # Module 1: Networking (VPC, Subnets)
 module "networking" {
