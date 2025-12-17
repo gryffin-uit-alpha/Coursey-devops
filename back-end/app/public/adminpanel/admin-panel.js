@@ -5,7 +5,7 @@ document.getElementById("add-course-form").addEventListener("submit", async (eve
     const formData = new FormData(form);
 
     try {
-        const response = await fetch("http://localhost:8080/adminPanel/courseService.php", {
+        const response = await fetch(`${API_BASE_URL}/adminPanel/courseService.php`, {
             method: "POST",
             headers: {
                 "Authorization": "Bearer eyJ1c2VybmFtZSI6Imx5bm4iLCJleHBpcnkiOjE3MzE4OTgxNzd9"
