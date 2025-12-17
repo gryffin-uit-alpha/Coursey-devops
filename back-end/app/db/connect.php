@@ -28,7 +28,7 @@ class Database {
         }
         return self::$instance;
     }
-
+    ####
     // Kết nối cơ sở dữ liệu
     private function connect() {
         try {
