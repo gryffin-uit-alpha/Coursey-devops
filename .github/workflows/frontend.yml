@@ -9,9 +9,10 @@ on:
       - ".github/workflows/frontend.yml"
   workflow_dispatch:
 
+# Configure these as GitHub Repository Variables (Settings > Secrets and variables > Variables)
 env:
-  AWS_REGION: us-east-1
-  S3_BUCKET_NAME: coursey-project
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
 
 jobs:
   sonar-scan:
@@ -60,6 +61,8 @@ jobs:
         working-directory: ./front-end
         env:
           CI: false
+          # Inject API URL at build time using domain from repository variables
+          REACT_APP_API_URL: https://api.${{ vars.DOMAIN_NAME }}/
         run: |
           npm ci 
           npm run build

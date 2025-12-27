@@ -8,23 +8,123 @@ on:
       - "helm-charts/**"
       - ".github/workflows/backend.yml"
   workflow_dispatch:
+    inputs:
+      force_rebuild_all:
+        description: "Force rebuild all services (ignore path filtering)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   security-events: write
 
+# Configure these as GitHub Repository Variables (Settings > Secrets and variables > Variables)
 env:
-  AWS_REGION: us-east-1
-  EKS_CLUSTER_NAME: gryffin-eks-cluster
-
-  ECR_REPO_PHP: coursey/php
-  ECR_REPO_PYTHON: coursey/python
-  ECR_REPO_NGINX: coursey/nginx
-  ECR_REPO_MYSQL: coursey/mysql
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  ECR_REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'coursey' }}
 
 jobs:
+  # ============================================================
+  # STEP 1: Detect which services have changed
+  # ============================================================
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      php: ${{ steps.filter.outputs.php }}
+      python: ${{ steps.filter.outputs.python }}
+      nginx: ${{ steps.filter.outputs.nginx }}
+      mysql: ${{ steps.filter.outputs.mysql }}
+      shared: ${{ steps.filter.outputs.shared }}
+      any_service: ${{ steps.check.outputs.any_service }}
+      services_to_build: ${{ steps.matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for git diff
+
+      # Use dorny/paths-filter for reliable change detection
+      - name: Detect Changed Paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            php:
+              - 'back-end/php/**'
+              - 'back-end/app/**'
+            python:
+              - 'back-end/python/**'
+            nginx:
+              - 'back-end/nginx/**'
+              - 'back-end/app/public/**'
+            mysql:
+              - 'back-end/mysql/**'
+            shared:
+              - 'back-end/.env*'
+              - 'back-end/docker-compose.yml'
+              - '.github/workflows/backend.yml'
+
+      # Check if any service needs building
+      - name: Check for Any Changes
+        id: check
+        run: |
+          if [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.shared }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.php }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.python }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.mysql }}" == "true" ]]; then
+            echo "any_service=true" >> $GITHUB_OUTPUT
+          else
+            echo "any_service=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Build dynamic matrix of services to build
+      - name: Build Service Matrix
+        id: matrix
+        run: |
+          FORCE="${{ github.event.inputs.force_rebuild_all }}"
+          SHARED="${{ steps.filter.outputs.shared }}"
+
+          services=()
+
+          # If force rebuild or shared files changed, build all
+          if [[ "$FORCE" == "true" ]] || [[ "$SHARED" == "true" ]]; then
+            services=('{"name":"php","dockerfile":"back-end/php/Dockerfile"}' 
+                      '{"name":"python","dockerfile":"back-end/python/Dockerfile"}'
+                      '{"name":"nginx","dockerfile":"back-end/nginx/Dockerfile"}'
+                      '{"name":"mysql","dockerfile":"back-end/mysql/Dockerfile"}')
+          else
+            # Only add changed services
+            [[ "${{ steps.filter.outputs.php }}" == "true" ]] && \
+              services+=('{"name":"php","dockerfile":"back-end/php/Dockerfile"}')
+            [[ "${{ steps.filter.outputs.python }}" == "true" ]] && \
+              services+=('{"name":"python","dockerfile":"back-end/python/Dockerfile"}')
+            [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] && \
+              services+=('{"name":"nginx","dockerfile":"back-end/nginx/Dockerfile"}')
+            [[ "${{ steps.filter.outputs.mysql }}" == "true" ]] && \
+              services+=('{"name":"mysql","dockerfile":"back-end/mysql/Dockerfile"}')
+          fi
+
+          # Convert to JSON array
+          if [ ${#services[@]} -eq 0 ]; then
+            echo "services=[]" >> $GITHUB_OUTPUT
+          else
+            json_array=$(printf '%s\n' "${services[@]}" | jq -s -c '.')
+            echo "services=$json_array" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Services to build: ${services[*]}"
+
+  # ============================================================
+  # STEP 2: SonarQube Scan (runs on any backend change)
+  # ============================================================
   sonar-scan:
     name: SonarQube Backend Scan
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,32 +138,20 @@ jobs:
           projectBaseDir: .
           args: >
             -Dproject.settings=sonar-backend.properties
-      # - name: Quality Gate
-      #   uses: SonarSource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env: { SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }} }
 
+  # ============================================================
+  # STEP 3: Build & Push ONLY Changed Services
+  # ============================================================
   build-push:
-    needs: sonar-scan
+    needs: [detect-changes, sonar-scan]
+    if: needs.detect-changes.outputs.services_to_build != '[]'
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.define_tag.outputs.tag }} # Tag for deloyment
+      image_tag: ${{ steps.define_tag.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - name: php
-            repo: coursey/php
-            dockerfile: back-end/php/Dockerfile
-          - name: python
-            repo: coursey/python
-            dockerfile: back-end/python/Dockerfile
-          - name: nginx
-            repo: coursey/nginx
-            dockerfile: back-end/nginx/Dockerfile
-          - name: mysql
-            repo: coursey/mysql
-            dockerfile: back-end/mysql/Dockerfile
+        service: ${{ fromJson(needs.detect-changes.outputs.services_to_build) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -86,20 +174,21 @@ jobs:
       - name: Build ${{ matrix.service.name }} Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: ${{ matrix.service.repo }}
+          ECR_REPO: ${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}
           IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
           DOCKERFILE_PATH: ${{ matrix.service.dockerfile }}
         run: |
+          echo "🔨 Building ${{ matrix.service.name }} (changed files detected)"
           docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest -f $DOCKERFILE_PATH ./back-end
 
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service.repo }}:${{ steps.define_tag.outputs.tag }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}:${{ steps.define_tag.outputs.tag }}
           format: "sarif"
           output: "trivy-results-${{ matrix.service.name }}.sarif"
           severity: "CRITICAL,HIGH,MEDIUM"
-          exit-code: "0" # Non-blocking: report vulnerabilities but don't fail build
+          exit-code: "0"
 
       - name: Upload Trivy Scan Results
         uses: github/codeql-action/upload-sarif@v3
@@ -111,15 +200,19 @@ jobs:
       - name: Push ${{ matrix.service.name }} to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: ${{ matrix.service.repo }}
+          ECR_REPO: ${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}
           IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
         run: |
+          echo "🚀 Pushing ${{ matrix.service.name }} to ECR"
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO:latest
 
-  # DEPLOY TO EKS
+  # ============================================================
+  # STEP 4: Deploy to EKS (only if something was built)
+  # ============================================================
   deploy-eks:
-    needs: build-push
+    needs: [detect-changes, build-push]
+    if: always() && needs.detect-changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,15 +234,34 @@ jobs:
 
       - name: Deploy with Helm
         env:
-          TAG: ${{ needs.build-push.outputs.image_tag }}
+          TAG: ${{ needs.build-push.outputs.image_tag || github.sha }}
+          PHP_CHANGED: ${{ needs.detect-changes.outputs.php }}
+          PYTHON_CHANGED: ${{ needs.detect-changes.outputs.python }}
+          NGINX_CHANGED: ${{ needs.detect-changes.outputs.nginx }}
+          MYSQL_CHANGED: ${{ needs.detect-changes.outputs.mysql }}
         run: |
           echo "Deploying version: $TAG"
+          echo "Changed services: PHP=$PHP_CHANGED, Python=$PYTHON_CHANGED, Nginx=$NGINX_CHANGED, MySQL=$MYSQL_CHANGED"
+
+          # Build Helm set arguments dynamically for changed services
+          HELM_ARGS=""
+
+          # Always set tags for changed services, use 'latest' for unchanged
+          if [[ "$PHP_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
+            HELM_ARGS="$HELM_ARGS --set php.image.tag=$TAG"
+          fi
+          if [[ "$PYTHON_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
+            HELM_ARGS="$HELM_ARGS --set python.image.tag=$TAG"
+          fi
+          if [[ "$NGINX_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
+            HELM_ARGS="$HELM_ARGS --set nginx.image.tag=$TAG"
+          fi
+          if [[ "$MYSQL_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
+            HELM_ARGS="$HELM_ARGS --set mysql.image.tag=$TAG"
+          fi
 
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
-            --set php.image.tag=$TAG \
-            --set python.image.tag=$TAG \
-            --set nginx.image.tag=$TAG \
-            --set mysql.image.tag=$TAG \
+            $HELM_ARGS \
             --timeout 5m \
             --wait

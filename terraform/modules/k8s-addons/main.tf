@@ -1,6 +1,4 @@
-# ===================================
 # ALB Load Balancer Controller
-# ===================================
 
 data "http" "alb_iam_policy" {
   url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.10.0/docs/install/iam_policy.json"
@@ -69,9 +67,7 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 }
 
-# ===================================
 # External DNS
-# ===================================
 
 resource "aws_iam_policy" "external_dns_policy" {
   name        = "ExternalDNSPolicy-${var.cluster_name}"
@@ -151,9 +147,7 @@ resource "helm_release" "external_dns" {
   }
 }
 
-# ===================================
 # Monitoring (Prometheus + Grafana)
-# ===================================
 
 resource "kubernetes_namespace" "monitoring" {
   metadata {

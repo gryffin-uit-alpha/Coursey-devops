@@ -1,41 +1,84 @@
+# ==============================================================================
+# Docker Compose for Local Development
+# ==============================================================================
+# Usage: docker compose up
+# Ensure .env file exists (copy from .env.example)
+# ==============================================================================
+
 services:
-  # nginx
+  # Nginx - API Gateway
   web:
-    image: gryffin0109/courseyproject:nginx
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
     ports:
-      - "8080:80"
-      - "8082:8082"
+      - "8080:80" # API endpoint (matches REACT_APP_API_URL)
+      - "8082:8082" # Admin panel
+    networks:
+      coursey-net:
+        aliases:
+          - nginx-service # Matches K8s service name
     depends_on:
       - app
 
+  # PHP Application
   app:
-    image: gryffin0109/courseyproject:php
+    build:
+      context: .
+      dockerfile: php/Dockerfile
+    networks:
+      coursey-net:
+        aliases:
+          - php-service # Matches nginx fastcgi_pass
+    env_file:
+      - .env
     depends_on:
       - db
 
+  # MySQL Database
   db:
-    image: gryffin0109/courseyproject:mysql
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
     volumes:
       - mysqldata:/var/lib/mysql
     ports:
-      - "3307:3306"
-    restart: unless-stopped
+      - "3307:3306" # Exposed for local tools (DBeaver, etc.)
+    networks:
+      coursey-net:
+        aliases:
+          - coursey-database-service # Matches K8s service name
     env_file:
-      - ./.env/.env
+      - .env
+    restart: unless-stopped
 
+  # Python Service (YouTube URL extraction)
+  python:
+    build:
+      context: .
+      dockerfile: python/Dockerfile
+    ports:
+      - "8002:8002"
+    networks:
+      coursey-net:
+        aliases:
+          - python-service # Matches K8s service name
+
+  # PHPMyAdmin (Development tool)
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     ports:
       - "8081:80"
-    env_file:
-      - ./.env/.env
+    environment:
+      - PMA_HOST=db
+    networks:
+      - coursey-net
     depends_on:
       - db
 
-  python:
-    image: gryffin0109/courseyproject:python
-    ports:
-      - "8002:8002"
+networks:
+  coursey-net:
+    driver: bridge
 
 volumes:
   mysqldata:

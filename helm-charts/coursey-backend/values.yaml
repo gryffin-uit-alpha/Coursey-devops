@@ -1,18 +1,18 @@
 secrets:
   mysqlHost: "coursey-database-service"
-  mysqlRootPassword: "gryffin0811" # NÊN ĐỔI
-  mysqlUser: "gryffin0811"
+  mysqlRootPassword: "CHANGE_ME_ROOT_PASSWORD"
+  mysqlUser: "CHANGE_ME_USERNAME"
   mysqlDatabase: "docker-php"
-  mysqlPassword: "gryffin0811"
+  mysqlPassword: "CHANGE_ME_PASSWORD"
   pmaHost: "db"
-  hostName: "gryffin-uit.site"
-  mailUsername: "khoatn@tensoract.io"
-  passApp: "uobo eiam ijmi clzy"
+  hostName: "YOUR_DOMAIN" # e.g., example.com
+  mailUsername: "YOUR_EMAIL" # For password reset emails
+  passApp: "YOUR_APP_PASSWORD" # Gmail app password
 
 python:
   replicaCount: 1
   image:
-    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/python
+    repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/python
     tag: "latest"
   service:
     port: 8002
@@ -27,7 +27,7 @@ python:
 php:
   replicaCount: 2
   image:
-    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/php
+    repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/php
     tag: "latest"
   service:
     port: 9000
@@ -42,7 +42,7 @@ php:
 nginx:
   replicaCount: 1
   image:
-    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/nginx
+    repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/nginx
     tag: "latest"
   service:
     # ALB target-type: ClusterIP
@@ -65,7 +65,7 @@ nginx:
 mysql:
   replicaCount: 1
   image:
-    repository: 243826067721.dkr.ecr.us-east-1.amazonaws.com/coursey/mysql
+    repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/mysql
     tag: "latest"
   service:
     port: 3306
@@ -82,7 +82,7 @@ mysql:
       cpu: "2000m"
 
 appConfig:
-  apiBaseUrl: "https://api.gryffin-uit.site"
+  apiBaseUrl: "https://api.YOUR_DOMAIN" # e.g., https://api.example.com
 
 ingress:
   enabled: true
@@ -91,16 +91,16 @@ ingress:
     groupName: "coursey-group"
     scheme: "internet-facing"
     targetType: "ip"
-    certificateArn: "arn:aws:acm:us-east-1:243826067721:certificate/214cc77d-7dbf-4c98-904e-637477611aad"
+    certificateArn: "arn:aws:acm:YOUR_REGION:YOUR_AWS_ACCOUNT:certificate/YOUR_CERTIFICATE_ID"
 
   hosts:
     - name: "api"
-      host: "api.gryffin-uit.site"
+      host: "api.YOUR_DOMAIN" # e.g., api.example.com
       serviceName: "nginx-service"
       port: 80
 
     - name: "admin"
-      host: "admin.gryffin-uit.site"
+      host: "admin.YOUR_DOMAIN" # e.g., admin.example.com
       serviceName: "nginx-service"
       port: 8082
 

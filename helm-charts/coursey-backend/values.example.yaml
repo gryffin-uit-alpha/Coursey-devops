@@ -1,0 +1,74 @@
+# ==============================================================================
+# Helm Values Template - Coursey Backend
+# ==============================================================================
+# Copy this file: cp values.example.yaml values-local.yaml
+# Fill in your values and deploy with:
+#   helm upgrade --install coursey . -f values.yaml -f values-local.yaml
+# ==============================================================================
+
+# ===== Global Configuration =====
+global:
+  # Your AWS ECR registry URL (format: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com)
+  imageRegistry: "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+
+# ===== Secrets Configuration =====
+# IMPORTANT: For production, use External Secrets Operator or Sealed Secrets
+# instead of storing secrets in values files!
+secrets:
+  mysqlHost: "coursey-database-service"
+  mysqlRootPassword: "CHANGE_ME_ROOT_PASSWORD"
+  mysqlUser: "CHANGE_ME_USERNAME"
+  mysqlDatabase: "docker-php"
+  mysqlPassword: "CHANGE_ME_PASSWORD"
+  pmaHost: "db"
+  hostName: "your-domain.com"
+  mailUsername: "your-email@example.com"
+  passApp: "your-app-password"
+
+# ===== Service Images =====
+# Override the image registry using global.imageRegistry
+python:
+  image:
+    repository: "{{ .Values.global.imageRegistry }}/coursey/python"
+    tag: "latest"
+
+php:
+  image:
+    repository: "{{ .Values.global.imageRegistry }}/coursey/php"
+    tag: "latest"
+
+nginx:
+  image:
+    repository: "{{ .Values.global.imageRegistry }}/coursey/nginx"
+    tag: "latest"
+
+mysql:
+  image:
+    repository: "{{ .Values.global.imageRegistry }}/coursey/mysql"
+    tag: "latest"
+
+# ===== Application Configuration =====
+appConfig:
+  apiBaseUrl: "https://api.your-domain.com"
+
+# ===== Ingress Configuration =====
+ingress:
+  enabled: true
+  className: "alb"
+  alb:
+    groupName: "coursey-group"
+    scheme: "internet-facing"
+    targetType: "ip"
+    # Replace with your ACM certificate ARN
+    certificateArn: "arn:aws:acm:REGION:ACCOUNT_ID:certificate/CERTIFICATE_ID"
+
+  hosts:
+    - name: "api"
+      host: "api.your-domain.com"
+      serviceName: "nginx-service"
+      port: 80
+
+    - name: "admin"
+      host: "admin.your-domain.com"
+      serviceName: "nginx-service"
+      port: 8082

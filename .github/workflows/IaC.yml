@@ -15,8 +15,9 @@ on:
 
   workflow_dispatch:
 
+# Configure these as GitHub Repository Variables (Settings > Secrets and variables > Variables)
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   TF_VAR_grafana_password: ${{ secrets.GRAFANA_PASSWORD }}
 
 jobs:

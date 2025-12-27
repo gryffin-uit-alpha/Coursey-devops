@@ -28,3 +28,68 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# ==============================================================================
+# Local Configuration Files (contain user-specific values)
+# ==============================================================================
+# These files are generated from *.example templates
+# They should NOT be committed as they contain environment-specific values
+terraform/terraform.tfvars
+terraform/backend.hcl
+helm-charts/coursey-backend/values-local.yaml
+
+# Root-level .env (copied from example.env)
+.env
+
+# Backend .env (copied from back-end/.env.example)
+back-end/.env
+
+# Keep the example templates
+!example.env
+!terraform/terraform.tfvars.example
+!terraform/backend.hcl.example
+!helm-charts/coursey-backend/values.example.yaml
+!back-end/.env.example
+!front-end/.env.example
+
+# ==============================================================================
+# Terraform Additional
+# ==============================================================================
+# Terraform plan output files
+*.tfplan
+tfplan
+terraform/tfplan
+
+# Terraform lock files (optional, some prefer to commit this)
+# .terraform.lock.hcl
+
+# ==============================================================================
+# Node.js / Frontend
+# ==============================================================================
+node_modules/
+front-end/node_modules/
+front-end/build/
+front-end/dist/
+*.log
+npm-debug.log*
+
+# ==============================================================================
+# IDE / Editor
+# ==============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# OS Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+
+# ==============================================================================
+# Docker
+# ==============================================================================
+*.log
+docker-compose.override.yml
