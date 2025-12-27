@@ -27,13 +27,22 @@ help:
 	@echo "  make terraform-apply   - Apply Terraform changes"
 	@echo "  make terraform-destroy - Destroy infrastructure (use with caution!)"
 	@echo ""
-	@echo "$(CYAN)Helm:$(RESET)"
+	@echo "$(CYAN)Docker/ECR:$(RESET)"
+	@echo "  make docker-build      - Build all Docker images locally"
+	@echo "  make ecr-login         - Login to Amazon ECR"
+	@echo "  make docker-push       - Tag and push images to ECR"
+	@echo ""
+	@echo "$(CYAN)Kubernetes/Helm:$(RESET)"
+	@echo "  make kubeconfig        - Update kubeconfig for EKS cluster"
 	@echo "  make helm-deploy       - Deploy application via Helm"
 	@echo "  make helm-uninstall    - Uninstall Helm release"
+	@echo "  make pods              - List all running pods"
+	@echo "  make logs              - Tail logs for a pod"
 	@echo ""
 	@echo "$(CYAN)Cleanup:$(RESET)"
 	@echo "  make clean             - Clean up local Terraform files"
 	@echo ""
+
 
 # Initialize project with example files
 init:
@@ -95,3 +104,50 @@ clean:
 	rm -rf terraform/.terraform
 	rm -f terraform/.terraform.lock.hcl
 	@echo "$(CYAN)✅ Cleanup complete$(RESET)"
+
+# ==============================================================================
+# AWS / Kubernetes Helpers
+# ==============================================================================
+
+# Get kubeconfig for EKS cluster
+kubeconfig:
+	@echo "$(CYAN)Updating kubeconfig...$(RESET)"
+	@. ./.env 2>/dev/null || true; \
+	aws eks update-kubeconfig --name $${EKS_CLUSTER_NAME:-my-eks-cluster} --region $${AWS_REGION:-us-east-1}
+	@echo "$(CYAN)✅ Kubeconfig updated$(RESET)"
+
+# Login to ECR
+ecr-login:
+	@echo "$(CYAN)Logging into ECR...$(RESET)"
+	@. ./.env 2>/dev/null || true; \
+	aws ecr get-login-password --region $${AWS_REGION:-us-east-1} | \
+	docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID:-$(shell aws sts get-caller-identity --query Account --output text)}.dkr.ecr.$${AWS_REGION:-us-east-1}.amazonaws.com
+	@echo "$(CYAN)✅ ECR login successful$(RESET)"
+
+# Build all Docker images
+docker-build:
+	@echo "$(CYAN)Building Docker images...$(RESET)"
+	docker build -t coursey/php:latest -f back-end/php/Dockerfile back-end/
+	docker build -t coursey/nginx:latest -f back-end/nginx/Dockerfile back-end/
+	docker build -t coursey/mysql:latest -f back-end/mysql/Dockerfile back-end/
+	docker build -t coursey/python:latest -f back-end/python/Dockerfile back-end/python/
+	@echo "$(CYAN)✅ All images built$(RESET)"
+
+# Push all Docker images to ECR
+docker-push: ecr-login
+	@echo "$(CYAN)Pushing images to ECR...$(RESET)"
+	@. ./.env 2>/dev/null || true; \
+	ECR_URI=$${AWS_ACCOUNT_ID:-$(shell aws sts get-caller-identity --query Account --output text)}.dkr.ecr.$${AWS_REGION:-us-east-1}.amazonaws.com; \
+	for svc in php nginx mysql python; do \
+		docker tag coursey/$$svc:latest $$ECR_URI/$${ECR_REPO_PREFIX:-coursey}/$$svc:latest && \
+		docker push $$ECR_URI/$${ECR_REPO_PREFIX:-coursey}/$$svc:latest; \
+	done
+	@echo "$(CYAN)✅ All images pushed$(RESET)"
+
+# View running pods
+pods:
+	kubectl get pods -A
+
+# View logs for a specific pod
+logs:
+	@read -p "Enter pod name: " pod; kubectl logs -f $$pod

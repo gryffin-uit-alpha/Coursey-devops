@@ -129,6 +129,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
+
+      - name: Configure SonarQube Properties
+        run: |
+          sed -i "s/YOUR_SONAR_ORG/${{ vars.SONAR_ORG }}/g" sonar-backend.properties
+          echo "Updated sonar-backend.properties with org: ${{ vars.SONAR_ORG }}"
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
@@ -239,6 +245,8 @@ jobs:
           PYTHON_CHANGED: ${{ needs.detect-changes.outputs.python }}
           NGINX_CHANGED: ${{ needs.detect-changes.outputs.nginx }}
           MYSQL_CHANGED: ${{ needs.detect-changes.outputs.mysql }}
+          ACM_CERT_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+          DOMAIN: ${{ vars.DOMAIN_NAME }}
         run: |
           echo "Deploying version: $TAG"
           echo "Changed services: PHP=$PHP_CHANGED, Python=$PYTHON_CHANGED, Nginx=$NGINX_CHANGED, MySQL=$MYSQL_CHANGED"
@@ -259,6 +267,13 @@ jobs:
           if [[ "$MYSQL_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
             HELM_ARGS="$HELM_ARGS --set mysql.image.tag=$TAG"
           fi
+
+          # Inject domain and certificate from secrets/variables
+          HELM_ARGS="$HELM_ARGS --set ingress.alb.certificateArn=$ACM_CERT_ARN"
+          HELM_ARGS="$HELM_ARGS --set secrets.hostName=$DOMAIN"
+          HELM_ARGS="$HELM_ARGS --set appConfig.apiBaseUrl=https://api.$DOMAIN"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].host=api.$DOMAIN"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].host=admin.$DOMAIN"
 
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \

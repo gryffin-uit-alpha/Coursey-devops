@@ -24,6 +24,11 @@ jobs:
         with:
           fetch-depth: 0 # Full git history for SonarQube analysis
 
+      - name: Configure SonarQube Properties
+        run: |
+          sed -i "s/YOUR_SONAR_ORG/${{ vars.SONAR_ORG }}/g" sonar-frontend.properties
+          echo "Updated sonar-frontend.properties with org: ${{ vars.SONAR_ORG }}"
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
