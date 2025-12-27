@@ -184,6 +184,17 @@ jobs:
           IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
           DOCKERFILE_PATH: ${{ matrix.service.dockerfile }}
         run: |
+          # Create .env file if missing (required for Docker build context)
+          if [ ! -f ./back-end/.env ]; then
+            if [ -f ./back-end/.env.example ]; then
+              cp ./back-end/.env.example ./back-end/.env
+              echo "✅ Created .env from .env.example"
+            else
+              touch ./back-end/.env
+              echo "⚠️ Created empty .env"
+            fi
+          fi
+
           echo "🔨 Building ${{ matrix.service.name }} (changed files detected)"
           docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest -f $DOCKERFILE_PATH ./back-end
 
@@ -272,8 +283,16 @@ jobs:
           HELM_ARGS="$HELM_ARGS --set ingress.alb.certificateArn=$ACM_CERT_ARN"
           HELM_ARGS="$HELM_ARGS --set secrets.hostName=$DOMAIN"
           HELM_ARGS="$HELM_ARGS --set appConfig.apiBaseUrl=https://api.$DOMAIN"
+
+          # Set complete ingress host configurations (all fields required to avoid losing serviceName/port)
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].name=api"
           HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].host=api.$DOMAIN"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].serviceName=nginx-service"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].port=80"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].name=admin"
           HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].host=admin.$DOMAIN"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].serviceName=nginx-service"
+          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].port=8082"
 
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
