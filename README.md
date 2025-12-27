@@ -103,7 +103,49 @@ aws s3 mb s3://my-terraform-state-bucket --region us-east-1
 aws s3api put-bucket-versioning --bucket my-terraform-state-bucket --versioning-configuration Status=Enabled
 ```
 
+### 6. SonarQube Setup (Code Quality)
+
+This monorepo uses **two separate SonarQube projects** - one for backend, one for frontend.
+
+**Step 1: Create SonarCloud Organization**
+
+1. Go to [SonarCloud.io](https://sonarcloud.io) → Sign in with GitHub
+2. Create or select your organization (e.g., `my-org`)
+
+**Step 2: Create Projects**
+
+Create **two projects** for this monorepo:
+
+| Project | Key | Name |
+|---------|-----|------|
+| Backend | `my-org_project-backend` | Project Backend |
+| Frontend | `my-org_project-frontend` | Project Frontend |
+
+**Step 3: Generate Tokens**
+
+1. Go to **My Account → Security → Generate Tokens**
+2. Create **two tokens**:
+   - `SONAR_TOKEN_BACKEND` - for backend analysis
+   - `SONAR_TOKEN_FRONTEND` - for frontend analysis
+
+**Step 4: Add to GitHub Secrets**
+
+| Secret | Value |
+|--------|-------|
+| `SONAR_HOST_URL` | `https://sonarcloud.io` |
+| `SONAR_TOKEN_BACKEND` | Token from Step 3 |
+| `SONAR_TOKEN_FRONTEND` | Token from Step 3 |
+
+**Step 5: Add GitHub Variable**
+
+| Variable | Value |
+|----------|-------|
+| `SONAR_ORG` | Your SonarCloud organization (e.g., `my-org`) |
+
+> **Note:** The workflow automatically replaces `YOUR_SONAR_ORG` placeholder in `sonar-*.properties` with your `SONAR_ORG` variable at runtime.
+
 ---
+
 
 ## Quick Start
 
