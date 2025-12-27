@@ -19,6 +19,10 @@ on:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   TF_VAR_grafana_password: ${{ secrets.GRAFANA_PASSWORD }}
+  TF_VAR_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+  TF_VAR_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_VAR_domain_name: ${{ vars.DOMAIN_NAME }}
+  TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID }}
 
 jobs:
   terraform:
