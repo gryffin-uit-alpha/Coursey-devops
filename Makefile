@@ -130,7 +130,7 @@ docker-build:
 	docker build -t coursey/php:latest -f back-end/php/Dockerfile back-end/
 	docker build -t coursey/nginx:latest -f back-end/nginx/Dockerfile back-end/
 	docker build -t coursey/mysql:latest -f back-end/mysql/Dockerfile back-end/
-	docker build -t coursey/python:latest -f back-end/python/Dockerfile back-end/python/
+	docker build -t coursey/python:latest -f back-end/python/Dockerfile back-end/
 	@echo "$(CYAN)✅ All images built$(RESET)"
 
 # Push all Docker images to ECR

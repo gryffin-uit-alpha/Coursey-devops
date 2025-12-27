@@ -309,9 +309,79 @@ kubectl get nodes
 ```
 
 
-### 5. Manual Deployment (Optional)
+### 5. Deploy via Makefile (CLI)
 
-If deploying manually without CI/CD, use Helm with `--set` flags to inject your configuration:
+> ⚠️ **IMPORTANT:** Before using Makefile commands, you MUST edit **ALL configuration files** with your actual values!
+
+**Step 1: Configure All Environment Files**
+
+After running `make init`, edit the following files:
+
+```bash
+# Required files to configure:
+nano .env                                        # AWS & project settings
+nano terraform/terraform.tfvars                  # Terraform variables
+nano terraform/backend.hcl                       # Remote state config
+nano helm-charts/coursey-backend/values-local.yaml  # Helm overrides
+```
+
+**`.env` - Critical values to update:**
+```bash
+AWS_REGION=us-east-1
+AWS_ACCOUNT_ID=087736691889          # ⚠️ YOUR AWS Account ID
+EKS_CLUSTER_NAME=coursey-eks-cluster # ⚠️ YOUR cluster name
+ECR_REPO_PREFIX=coursey              # ⚠️ YOUR ECR prefix
+DOMAIN_NAME=example.com              # ⚠️ YOUR domain
+```
+
+**Step 2: Build & Push Docker Images**
+
+```bash
+# Build all service images locally
+make docker-build
+
+# Login to ECR and push images
+make docker-push
+```
+
+**Step 3: Deploy Application with Helm**
+
+```bash
+# Update kubeconfig for your cluster
+make kubeconfig
+
+# Verify cluster access
+make pods  # Should show running pods (or empty if first deploy)
+
+# Deploy application
+make helm-deploy
+```
+
+**Complete Makefile Deployment Flow:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. make init          → Create config files from templates     │
+│  2. Edit .env files    → Configure YOUR actual values           │
+│  3. make validate      → Verify all configs exist               │
+├─────────────────────────────────────────────────────────────────┤
+│  4. make terraform-init   → Initialize Terraform                │
+│  5. make terraform-plan   → Preview infrastructure changes      │
+│  6. make terraform-apply  → Deploy AWS infrastructure           │
+├─────────────────────────────────────────────────────────────────┤
+│  7. make docker-build  → Build PHP, Nginx, MySQL, Python images │
+│  8. make ecr-login     → Authenticate with ECR                  │
+│  9. make docker-push   → Push images to ECR                     │
+├─────────────────────────────────────────────────────────────────┤
+│  10. make kubeconfig   → Configure kubectl for EKS              │
+│  11. make helm-deploy  → Deploy app to Kubernetes               │
+│  12. make pods         → Verify pods are running                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6. Alternative: Direct Helm Deploy (Without Makefile)
+
+If you prefer to deploy directly without Makefile, use Helm with `--set` flags:
 
 ```bash
 # Update kubeconfig
@@ -340,6 +410,7 @@ helm upgrade --install coursey ./helm-charts/coursey-backend/ \
 | `example.com` | Your domain name |
 | `123456789` | Your AWS Account ID |
 | `us-east-1` | Your AWS Region |
+
 
 
 ## Local Development
