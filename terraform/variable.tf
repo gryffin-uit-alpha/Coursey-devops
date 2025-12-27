@@ -1,26 +1,35 @@
 variable "cluster_name" {
-  type    = string
-  default = "gryffin-eks-cluster"
+  description = "Name of the EKS cluster"
+  type        = string
+  # User must provide via terraform.tfvars
 }
 
 variable "region" {
-  type    = string
-  default = "us-east-1"
+  description = "AWS region for resources"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "grafana_password" {
-  description = "Password for Grafana Admin"
+  description = "Password for Grafana Admin (set via TF_VAR_grafana_password)"
   type        = string
   sensitive   = true
 }
 
-
 variable "hosted_zone_id" {
-  type    = string
-  default = "Z0553992X17INP7N2VQV"
+  description = "Route53 hosted zone ID for DNS records"
+  type        = string
+  # User must provide via terraform.tfvars
 }
 
 variable "domain_name" {
-  type    = string
-  default = "gryffin-uit.site"
+  description = "Domain name for the application (e.g., example.com)"
+  type        = string
+  # User must provide via terraform.tfvars
+}
+
+variable "log_retention_days" {
+  description = "Number of days to retain logs in CloudWatch and S3"
+  type        = number
+  default     = 30
 }

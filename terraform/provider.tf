@@ -5,16 +5,13 @@ terraform {
     helm       = { source = "hashicorp/helm", version = "~> 2.9" }
     kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.20" }
   }
-  backend "s3" {
-    bucket  = "kubegryffin"
-    key     = "coursey/terraform.tfstate"
-    region  = "us-east-1"
-    encrypt = true
-  }
+  # Backend is configured via -backend-config flag
+  # See: terraform/backend.hcl.example
+  backend "s3" {}
 }
 ####
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
 provider "kubernetes" {

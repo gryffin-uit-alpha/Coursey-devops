@@ -27,3 +27,25 @@ output "external_dns_role_arn" {
   description = "ARN of the IAM role for External DNS"
   value       = module.k8s_addons.external_dns_role_arn
 }
+
+# ECR Outputs
+output "ecr_repository_urls" {
+  description = "Map of ECR repository names to URLs"
+  value       = module.ecr.repository_urls
+}
+
+output "ecr_login_command" {
+  description = "Command to authenticate Docker with ECR"
+  value       = module.ecr.ecr_login_command
+}
+
+# CloudWatch Logging Outputs
+output "cloudwatch_log_group" {
+  description = "CloudWatch Log Group for application logs"
+  value       = module.cloudwatch_logging.cloudwatch_log_group_application
+}
+
+output "logs_s3_bucket" {
+  description = "S3 bucket for archived logs"
+  value       = module.cloudwatch_logging.s3_bucket_name
+}

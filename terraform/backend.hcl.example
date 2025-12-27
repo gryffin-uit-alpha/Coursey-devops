@@ -1,0 +1,14 @@
+# ==============================================================================
+# Terraform S3 Backend Configuration Template
+# ==============================================================================
+# Copy this file: cp backend.hcl.example backend.hcl
+# Then initialize with: terraform init -backend-config=backend.hcl
+# ==============================================================================
+
+bucket  = "your-terraform-state-bucket"
+key     = "your-project/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+
+# Optional: DynamoDB table for state locking
+# dynamodb_table = "terraform-state-lock"

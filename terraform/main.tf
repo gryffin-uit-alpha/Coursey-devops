@@ -34,3 +34,22 @@ module "k8s_addons" {
   # Ensure cluster is ready before installing addons
   depends_on = [module.cluster]
 }
+
+# Module 4: ECR Repositories
+module "ecr" {
+  source = "./modules/ecr"
+}
+
+# Module 5: CloudWatch Logging (Fluent Bit + S3 Archival)
+module "cloudwatch_logging" {
+  source = "./modules/cloudwatch-logging"
+
+  cluster_name       = var.cluster_name
+  region             = var.region
+  oidc_provider_arn  = module.cluster.oidc_provider_arn
+  log_retention_days = var.log_retention_days
+
+  # Ensure cluster is ready before installing Fluent Bit
+  depends_on = [module.cluster]
+}
+

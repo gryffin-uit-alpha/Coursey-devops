@@ -34,7 +34,7 @@ module "eks" {
       desired_size = var.node_group_desired_size
 
       instance_types = var.node_instance_types
-      capacity_type  = "ON_DEMAND"
+      capacity_type  = "SPOT"
       ami_type       = "AL2023_x86_64_STANDARD"
 
       iam_role_additional_policies = {
