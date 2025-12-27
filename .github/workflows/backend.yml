@@ -26,9 +26,7 @@ env:
   ECR_REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'coursey' }}
 
 jobs:
-  # ============================================================
   # STEP 1: Detect which services have changed
-  # ============================================================
   detect-changes:
     name: Detect Changed Services
     runs-on: ubuntu-latest
@@ -118,9 +116,7 @@ jobs:
 
           echo "Services to build: ${services[*]}"
 
-  # ============================================================
   # STEP 2: SonarQube Scan (runs on any backend change)
-  # ============================================================
   sonar-scan:
     name: SonarQube Backend Scan
     needs: detect-changes
@@ -145,9 +141,7 @@ jobs:
           args: >
             -Dproject.settings=sonar-backend.properties
 
-  # ============================================================
   # STEP 3: Build & Push ONLY Changed Services
-  # ============================================================
   build-push:
     needs: [detect-changes, sonar-scan]
     if: needs.detect-changes.outputs.services_to_build != '[]'
@@ -188,10 +182,10 @@ jobs:
           if [ ! -f ./back-end/.env ]; then
             if [ -f ./back-end/.env.example ]; then
               cp ./back-end/.env.example ./back-end/.env
-              echo "✅ Created .env from .env.example"
+              echo " Created .env from .env.example"
             else
               touch ./back-end/.env
-              echo "⚠️ Created empty .env"
+              echo " Created empty .env"
             fi
           fi
 
@@ -220,13 +214,11 @@ jobs:
           ECR_REPO: ${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}
           IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
         run: |
-          echo "🚀 Pushing ${{ matrix.service.name }} to ECR"
+          echo "Pushing ${{ matrix.service.name }} to ECR"
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO:latest
 
-  # ============================================================
   # STEP 4: Deploy to EKS (only if something was built)
-  # ============================================================
   deploy-eks:
     needs: [detect-changes, build-push]
     if: always() && needs.detect-changes.outputs.any_service == 'true'
@@ -306,40 +298,3 @@ jobs:
             $HELM_ARGS \
             --timeout 5m \
             --wait
-
-      - name: Debug - Check Deployment Status
-        if: failure()
-        run: |
-          echo "=== Helm Release Status ==="
-          helm status coursey --namespace default || true
-
-          echo ""
-          echo "=== Pod Status ==="
-          kubectl get pods -n default -o wide || true
-
-          echo ""
-          echo "=== Ingress Status ==="
-          kubectl get ingress -n default -o yaml || true
-
-          echo ""
-          echo "=== Recent Events ==="
-          kubectl get events -n default --sort-by='.lastTimestamp' | tail -50 || true
-
-          echo ""
-          echo "=== Describe Failing Pods ==="
-          for pod in $(kubectl get pods -n default --field-selector=status.phase!=Running -o name); do
-            echo "--- Describing $pod ---"
-            kubectl describe -n default $pod || true
-            echo "--- Logs for $pod ---"
-            kubectl logs -n default $pod --all-containers --tail=100 || true
-          done
-
-      - name: Get Ingress URL
-        if: success()
-        run: |
-          echo "=== Deployment Successful ==="
-          INGRESS_HOST=$(kubectl get ingress coursey-alb-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "🚀 Application deployed successfully!"
-          echo "📍 Ingress URL: https://$INGRESS_HOST"
-          echo "📍 API URL: https://api.${{ vars.DOMAIN_NAME }}"
-          echo "📍 Admin URL: https://admin.${{ vars.DOMAIN_NAME }}"
