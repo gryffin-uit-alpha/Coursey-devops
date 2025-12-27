@@ -57,7 +57,7 @@ jobs:
             -backend-config="region=${{ vars.AWS_REGION }}"
 
       - name: Terraform Plan
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         id: plan
         run: terraform plan -no-color
         continue-on-error: true
@@ -67,5 +67,5 @@ jobs:
         run: exit 1
 
       - name: Terraform Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         run: terraform apply -auto-approve
