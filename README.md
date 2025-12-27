@@ -220,6 +220,7 @@ Go to your GitHub repository **Settings > Secrets and variables > Variables** an
 | `ECR_REPO_PREFIX` | ECR repository prefix | `coursey` |
 | `S3_BUCKET_NAME` | Frontend S3 bucket (from Prerequisites) | `my-frontend-bucket` |
 | `DOMAIN_NAME` | Your domain name | `example.com` |
+| `SONAR_ORG` | SonarCloud organization (from Prerequisites Step 6) | `my-org` |
 
 ### 3. Configure GitHub Secrets
 
