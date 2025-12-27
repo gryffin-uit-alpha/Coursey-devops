@@ -299,3 +299,40 @@ jobs:
             $HELM_ARGS \
             --timeout 5m \
             --wait
+
+      - name: Debug - Check Deployment Status
+        if: failure()
+        run: |
+          echo "=== Helm Release Status ==="
+          helm status coursey --namespace default || true
+
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -n default -o wide || true
+
+          echo ""
+          echo "=== Ingress Status ==="
+          kubectl get ingress -n default -o yaml || true
+
+          echo ""
+          echo "=== Recent Events ==="
+          kubectl get events -n default --sort-by='.lastTimestamp' | tail -50 || true
+
+          echo ""
+          echo "=== Describe Failing Pods ==="
+          for pod in $(kubectl get pods -n default --field-selector=status.phase!=Running -o name); do
+            echo "--- Describing $pod ---"
+            kubectl describe -n default $pod || true
+            echo "--- Logs for $pod ---"
+            kubectl logs -n default $pod --all-containers --tail=100 || true
+          done
+
+      - name: Get Ingress URL
+        if: success()
+        run: |
+          echo "=== Deployment Successful ==="
+          INGRESS_HOST=$(kubectl get ingress coursey-alb-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "🚀 Application deployed successfully!"
+          echo "📍 Ingress URL: https://$INGRESS_HOST"
+          echo "📍 API URL: https://api.${{ vars.DOMAIN_NAME }}"
+          echo "📍 Admin URL: https://admin.${{ vars.DOMAIN_NAME }}"
