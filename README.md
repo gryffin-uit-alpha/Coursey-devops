@@ -221,6 +221,8 @@ Go to your GitHub repository **Settings > Secrets and variables > Variables** an
 | `S3_BUCKET_NAME` | Frontend S3 bucket (from Prerequisites) | `my-frontend-bucket` |
 | `DOMAIN_NAME` | Your domain name | `example.com` |
 | `SONAR_ORG` | SonarCloud organization (from Prerequisites Step 6) | `my-org` |
+| `TF_STATE_BUCKET` | S3 bucket for Terraform state (from Prerequisites Step 5) | `my-terraform-state-bucket` |
+| `TF_STATE_KEY` | Path to save state file inside the bucket | `coursey/terraform.tfstate` |
 
 ### 3. Configure GitHub Secrets
 
