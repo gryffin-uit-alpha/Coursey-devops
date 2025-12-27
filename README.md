@@ -8,7 +8,50 @@
 
 ![System Overview](img/overview_system.png)
 
+## CI/CD Pipeline
+
+![CI/CD Pipeline](img/cicd-pipeline.png)
+
+This project uses **GitHub Actions** for automated CI/CD with three main workflows:
+
+### Backend Pipeline (`backend.yml`)
+
+| Stage | Description |
+|-------|-------------|
+| **Detect Changes** | Uses `dorny/paths-filter` to identify which services changed |
+| **SonarQube Scan** | Code quality analysis for PHP, Python, Nginx configs |
+| **Build & Push** | Builds Docker images only for changed services → ECR |
+| **Trivy Scan** | Container vulnerability scanning |
+| **Deploy to EKS** | Helm upgrade with dynamic image tags |
+
+**Selective Building:** Only changed services trigger builds. Shared file changes rebuild all.
+
+```
+back-end/php/**     → PHP image only
+back-end/python/**  → Python image only
+back-end/nginx/**   → Nginx image only
+back-end/mysql/**   → MySQL image only
+.github/workflows/* → ALL images
+```
+
+### Frontend Pipeline (`frontend.yml`)
+
+| Stage | Description |
+|-------|-------------|
+| **SonarQube Scan** | Code quality analysis for React/JS |
+| **Build** | `npm run build` with injected API URL |
+| **S3 Sync** | Deploy static files to S3 bucket |
+| **Invalidate CDN** | CloudFront cache invalidation |
+
+### Infrastructure Pipeline (`IaC.yml`)
+
+| Event | Action |
+|-------|--------|
+| **Pull Request** | `terraform plan` (preview changes) |
+| **Push to main** | `terraform apply` (deploy infrastructure) |
+
 ## Prerequisites (Manual Setup Required)
+
 
 Before deploying, you must manually create the following AWS resources:
 
