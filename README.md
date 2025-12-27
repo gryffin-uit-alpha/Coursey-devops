@@ -37,24 +37,61 @@ aws acm request-certificate \
 aws acm describe-certificate --certificate-arn <YOUR_CERT_ARN> --query 'Certificate.Status'
 ```
 
-### 3. S3 Bucket for Frontend (Static Website)
+### 3. S3 Bucket for Frontend (Private + CloudFront)
 
 ```bash
-# Create S3 bucket for frontend hosting
+# Create S3 bucket (will be PRIVATE - CloudFront will serve content)
 aws s3 mb s3://my-frontend-bucket --region us-east-1
 
-# Enable static website hosting
-aws s3 website s3://my-frontend-bucket --index-document index.html --error-document index.html
+# Block ALL public access (security best practice)
+aws s3api put-public-access-block --bucket my-frontend-bucket \
+  --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
-### 4. CloudFront Distribution (CDN)
+> **Note:** Do NOT enable static website hosting. S3 is just storage; CloudFront will handle serving.
 
-1. Go to AWS Console → CloudFront → Create Distribution
-2. Origin: Select your S3 bucket
-3. Viewer Protocol Policy: Redirect HTTP to HTTPS
-4. Alternate Domain Names (CNAMEs): `www.example.com`
-5. SSL Certificate: Select your ACM certificate
-6. Note the **Distribution ID** from the output
+### 4. CloudFront Distribution with OAC
+
+**Step 1: Create CloudFront Distribution**
+
+1. Go to **AWS Console → CloudFront → Create Distribution**
+2. **Origin domain**: Select your S3 bucket from dropdown (e.g., `my-frontend-bucket.s3.us-east-1.amazonaws.com`)
+   - ⚠️ Do NOT use the website endpoint URL
+3. **Origin access**: Select **Origin access control settings (recommended)**
+   - Click **Create control setting** → Use defaults → Create
+4. **Viewer protocol policy**: Redirect HTTP to HTTPS
+5. **Alternate domain names (CNAMEs)**: Add `www.example.com` (your domain)
+6. **Custom SSL certificate**: Select your ACM certificate
+7. **Default root object**: `index.html`
+8. Click **Create distribution**
+
+**Step 2: Update S3 Bucket Policy**
+
+After creating the distribution, CloudFront shows a banner: "The S3 bucket policy needs to be updated"
+
+1. Click **Copy policy** from the banner
+2. Go to **S3 → your bucket → Permissions → Bucket policy → Edit**
+3. Paste the policy and **Save**
+
+**Step 3: Configure SPA Routing (Error Pages)**
+
+Since S3 is private, it returns 403 for missing paths. CloudFront must handle this for React/Vue routing:
+
+1. Go to **CloudFront → your distribution → Error pages**
+2. Create custom error response:
+   - **HTTP error code**: `403: Forbidden`
+   - **Customize error response**: Yes
+   - **Response page path**: `/index.html`
+   - **HTTP response code**: `200: OK`
+3. Repeat for **404: Not Found**
+
+**Step 4: Invalidate Cache**
+
+```bash
+aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+```
+
+Note the **Distribution ID** for GitHub Secrets.
 
 ### 5. Terraform State Bucket (Optional but Recommended)
 
@@ -114,15 +151,77 @@ Add these secrets in **Settings > Secrets and variables > Secrets**:
 | `SONAR_TOKEN_BACKEND` | SonarQube backend token | SonarCloud → My Account |
 | `SONAR_TOKEN_FRONTEND` | SonarQube frontend token | SonarCloud → My Account |
 
-### 4. Deploy Infrastructure
+### 4. Deploy Infrastructure (Terraform)
+
+**Step 1: Configure Terraform Variables**
 
 ```bash
-# Plan and apply Terraform
-make terraform-plan
-make terraform-apply
-
-# Deploy application (via CI/CD or manually - see below)
+# Edit terraform.tfvars with your values
+nano terraform/terraform.tfvars
 ```
+
+```hcl
+# terraform/terraform.tfvars
+cluster_name   = "my-eks-cluster"
+region         = "us-east-1"
+domain_name    = "example.com"
+hosted_zone_id = "Z1234567890ABC"  # From Route53
+```
+
+**Step 2: Configure Terraform Backend (Optional)**
+
+```bash
+# Edit backend.hcl for remote state
+nano terraform/backend.hcl
+```
+
+```hcl
+# terraform/backend.hcl
+bucket = "my-terraform-state-bucket"
+key    = "coursey/terraform.tfstate"
+region = "us-east-1"
+```
+
+**Step 3: Deploy with Terraform**
+
+```bash
+# Set Grafana password (required)
+export TF_VAR_grafana_password="your-secure-password"
+
+# Initialize Terraform
+make terraform-init
+# Or: cd terraform && terraform init -backend-config=backend.hcl
+
+# Preview changes
+make terraform-plan
+
+# Apply infrastructure
+make terraform-apply
+```
+
+**What Terraform Creates:**
+| Resource | Description |
+|----------|-------------|
+| VPC | Private networking with public/private subnets |
+| EKS Cluster | Kubernetes control plane |
+| Node Group | Worker nodes (m7i-flex.large) |
+| ECR | Container registries for images |
+| ALB Controller | AWS Load Balancer for ingress |
+| External DNS | Automatic Route53 DNS management |
+| Prometheus + Grafana | Monitoring stack |
+| CloudWatch Logging | Fluent Bit → CloudWatch → S3 archival |
+
+**Step 4: Get Cluster Access**
+
+```bash
+# Update kubeconfig
+make kubeconfig
+# Or: aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+
+# Verify access
+kubectl get nodes
+```
+
 
 ### 5. Manual Deployment (Optional)
 
