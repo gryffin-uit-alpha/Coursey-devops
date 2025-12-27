@@ -50,6 +50,6 @@ module "cloudwatch_logging" {
   log_retention_days = var.log_retention_days
 
   # Ensure cluster is ready before installing Fluent Bit
-  depends_on = [module.cluster]
+  depends_on = [module.cluster, module.k8s_addons]
 }
 
