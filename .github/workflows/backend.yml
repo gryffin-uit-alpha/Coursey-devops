@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild_all:
-        description: "Force rebuild all services (ignore path filtering)"
+        description: "Force rebuild all services"
         required: false
         type: boolean
         default: false
@@ -19,15 +19,13 @@ permissions:
   contents: read
   security-events: write
 
-# Configure these as GitHub Repository Variables (Settings > Secrets and variables > Variables)
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   ECR_REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'coursey' }}
 
 jobs:
-  # STEP 1: Detect which services have changed
-  detect-changes:
+  changes:
     name: Detect Changed Services
     runs-on: ubuntu-latest
     outputs:
@@ -35,52 +33,23 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       nginx: ${{ steps.filter.outputs.nginx }}
       mysql: ${{ steps.filter.outputs.mysql }}
-      shared: ${{ steps.filter.outputs.shared }}
-      any_service: ${{ steps.check.outputs.any_service }}
-      services_to_build: ${{ steps.matrix.outputs.services }}
+      any_service: ${{ steps.matrix.outputs.any_service }}
+      matrix: ${{ steps.matrix.outputs.services }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for git diff
 
-      # Use dorny/paths-filter for reliable change detection
       - name: Detect Changed Paths
         id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            php:
-              - 'back-end/php/**'
-              - 'back-end/app/**'
-            python:
-              - 'back-end/python/**'
-            nginx:
-              - 'back-end/nginx/**'
-              - 'back-end/app/public/**'
-            mysql:
-              - 'back-end/mysql/**'
-            shared:
-              - 'back-end/.env*'
-              - 'back-end/docker-compose.yml'
-              - '.github/workflows/backend.yml'
+            php:    [ 'back-end/php/**', 'back-end/app/**' ]
+            python: [ 'back-end/python/**' ]
+            nginx:  [ 'back-end/nginx/**', 'back-end/app/public/**' ]
+            mysql:  [ 'back-end/mysql/**' ]
+            shared: [ 'back-end/.env*', 'back-end/docker-compose.yml', '.github/workflows/backend.yml' ]
 
-      # Check if any service needs building
-      - name: Check for Any Changes
-        id: check
-        run: |
-          if [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.shared }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.php }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.python }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.mysql }}" == "true" ]]; then
-            echo "any_service=true" >> $GITHUB_OUTPUT
-          else
-            echo "any_service=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Build dynamic matrix of services to build
-      - name: Build Service Matrix
+      - name: Build Dynamic Matrix
         id: matrix
         run: |
           FORCE="${{ github.event.inputs.force_rebuild_all }}"
@@ -88,50 +57,35 @@ jobs:
 
           services=()
 
-          # If force rebuild or shared files changed, build all
-          if [[ "$FORCE" == "true" ]] || [[ "$SHARED" == "true" ]]; then
-            services=('{"name":"php","dockerfile":"back-end/php/Dockerfile"}' 
-                      '{"name":"python","dockerfile":"back-end/python/Dockerfile"}'
-                      '{"name":"nginx","dockerfile":"back-end/nginx/Dockerfile"}'
-                      '{"name":"mysql","dockerfile":"back-end/mysql/Dockerfile"}')
+          # Logic: Build all if forced or shared files changed. Otherwise, build only changed.
+          if [[ "$FORCE" == "true" || "$SHARED" == "true" ]]; then
+            services=("php" "python" "nginx" "mysql")
           else
-            # Only add changed services
-            [[ "${{ steps.filter.outputs.php }}" == "true" ]] && \
-              services+=('{"name":"php","dockerfile":"back-end/php/Dockerfile"}')
-            [[ "${{ steps.filter.outputs.python }}" == "true" ]] && \
-              services+=('{"name":"python","dockerfile":"back-end/python/Dockerfile"}')
-            [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] && \
-              services+=('{"name":"nginx","dockerfile":"back-end/nginx/Dockerfile"}')
-            [[ "${{ steps.filter.outputs.mysql }}" == "true" ]] && \
-              services+=('{"name":"mysql","dockerfile":"back-end/mysql/Dockerfile"}')
+            [[ "${{ steps.filter.outputs.php }}" == "true" ]] && services+=("php")
+            [[ "${{ steps.filter.outputs.python }}" == "true" ]] && services+=("python")
+            [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] && services+=("nginx")
+            [[ "${{ steps.filter.outputs.mysql }}" == "true" ]] && services+=("mysql")
           fi
 
-          # Convert to JSON array
           if [ ${#services[@]} -eq 0 ]; then
+            echo "any_service=false" >> $GITHUB_OUTPUT
             echo "services=[]" >> $GITHUB_OUTPUT
           else
-            json_array=$(printf '%s\n' "${services[@]}" | jq -s -c '.')
-            echo "services=$json_array" >> $GITHUB_OUTPUT
+            echo "any_service=true" >> $GITHUB_OUTPUT
+            # Elegantly convert bash array to JSON array
+            echo "services=$(printf '%s\n' "${services[@]}" | jq -R . | jq -s -c .)" >> $GITHUB_OUTPUT
           fi
 
-          echo "Services to build: ${services[*]}"
-
-  # STEP 2: SonarQube Scan (runs on any backend change)
-  sonar-scan:
-    name: SonarQube Backend Scan
-    needs: detect-changes
-    if: needs.detect-changes.outputs.any_service == 'true'
+  sonar:
+    name: Code Quality Scan
+    needs: changes
+    if: needs.changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
-      - name: Configure SonarQube Properties
-        run: |
-          sed -i "s/YOUR_SONAR_ORG/${{ vars.SONAR_ORG }}/g" sonar-backend.properties
-          echo "Updated sonar-backend.properties with org: ${{ vars.SONAR_ORG }}"
-
-      - name: SonarQube Scan
+      - name: Run SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -140,18 +94,19 @@ jobs:
           projectBaseDir: .
           args: >
             -Dproject.settings=sonar-backend.properties
+            -Dsonar.organization=${{ vars.SONAR_ORG }}
 
-  # STEP 3: Build & Push ONLY Changed Services
-  build-push:
-    needs: [detect-changes, sonar-scan]
-    if: needs.detect-changes.outputs.services_to_build != '[]'
+  build:
+    name: Build & Push
+    needs: [changes, sonar]
+    if: needs.changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.define_tag.outputs.tag }}
+      image_tag: ${{ steps.tag.outputs.sha_short }}
     strategy:
       fail-fast: false
       matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services_to_build) }}
+        service: ${{ fromJson(needs.changes.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -167,61 +122,43 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Define Image Tag (Short SHA)
-        id: define_tag
-        run: echo "tag=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_OUTPUT
+      - name: Generate Image Tag
+        id: tag
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Build ${{ matrix.service.name }} Image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: ${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}
-          IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
-          DOCKERFILE_PATH: ${{ matrix.service.dockerfile }}
-        run: |
-          # Create .env file if missing (required for Docker build context)
-          if [ ! -f ./back-end/.env ]; then
-            if [ -f ./back-end/.env.example ]; then
-              cp ./back-end/.env.example ./back-end/.env
-              echo " Created .env from .env.example"
-            else
-              touch ./back-end/.env
-              echo " Created empty .env"
-            fi
-          fi
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          echo "🔨 Building ${{ matrix.service.name }} (changed files detected)"
-          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest -f $DOCKERFILE_PATH ./back-end
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./back-end
+          file: ./back-end/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service }}:${{ steps.tag.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service }}:latest
 
-      - name: Run Trivy Vulnerability Scanner
+      - name: Run Trivy Scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}:${{ steps.define_tag.outputs.tag }}
+          image-ref: "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service }}:${{ steps.tag.outputs.sha_short }}"
           format: "sarif"
-          output: "trivy-results-${{ matrix.service.name }}.sarif"
+          output: "trivy-results-${{ matrix.service }}.sarif"
           severity: "CRITICAL,HIGH,MEDIUM"
           exit-code: "0"
 
-      - name: Upload Trivy Scan Results
+      - name: Upload Trivy Results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: "trivy-results-${{ matrix.service.name }}.sarif"
-          category: trivy-${{ matrix.service.name }}
+          sarif_file: "trivy-results-${{ matrix.service }}.sarif"
+          category: trivy-${{ matrix.service }}
 
-      - name: Push ${{ matrix.service.name }} to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPO: ${{ env.ECR_REPO_PREFIX }}/${{ matrix.service.name }}
-          IMAGE_TAG: ${{ steps.define_tag.outputs.tag }}
-        run: |
-          echo "Pushing ${{ matrix.service.name }} to ECR"
-          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPO:latest
-
-  # STEP 4: Deploy to EKS (only if something was built)
-  deploy-eks:
-    needs: [detect-changes, build-push]
-    if: always() && needs.detect-changes.outputs.any_service == 'true'
+  deploy:
+    name: Deploy to EKS
+    needs: [changes, build]
+    if: always() && needs.changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -233,68 +170,75 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to ECR & Update Kubeconfig
+        id: aws-setup
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          echo "registry=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_OUTPUT
 
-      - name: Update Kubeconfig
-        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      - name: Generate Helm Values File
+        env:
+          REGISTRY: ${{ steps.aws-setup.outputs.registry }}
+          TAG: ${{ needs.build.outputs.image_tag || github.sha }}
+          DOMAIN: ${{ vars.DOMAIN_NAME }}
+          CERT_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        run: |
+          cat <<EOF > deploy-values.yaml
+          php:
+            image:
+              repository: $REGISTRY/${{ env.ECR_REPO_PREFIX }}/php
+              tag: "$( [[ "${{ needs.changes.outputs.php }}" == "true" ]] && echo $TAG || echo 'latest' )"
+          python:
+            image:
+              repository: $REGISTRY/${{ env.ECR_REPO_PREFIX }}/python
+              tag: "$( [[ "${{ needs.changes.outputs.python }}" == "true" ]] && echo $TAG || echo 'latest' )"
+          nginx:
+            image:
+              repository: $REGISTRY/${{ env.ECR_REPO_PREFIX }}/nginx
+              tag: "$( [[ "${{ needs.changes.outputs.nginx }}" == "true" ]] && echo $TAG || echo 'latest' )"
+          mysql:
+            image:
+              repository: $REGISTRY/${{ env.ECR_REPO_PREFIX }}/mysql
+              tag: "$( [[ "${{ needs.changes.outputs.mysql }}" == "true" ]] && echo $TAG || echo 'latest' )"
+
+          appConfig:
+            apiBaseUrl: "https://api.$DOMAIN"
+
+          secrets:
+            hostName: "$DOMAIN"
+            mysqlRootPassword: "$MYSQL_ROOT_PASSWORD"
+            mysqlUser: "$MYSQL_USER"
+            mysqlPassword: "$MYSQL_PASSWORD"
+            mailUsername: "$MAIL_USERNAME"
+            passApp: "$MAIL_PASSWORD"
+            
+          ingress:
+            alb:
+              certificateArn: "$CERT_ARN"
+            hosts:
+              - name: api
+                host: "api.$DOMAIN"
+                serviceName: nginx-service
+                port: 80
+              - name: admin
+                host: "admin.$DOMAIN"
+                serviceName: nginx-service
+                port: 8082
+          EOF
+
+          echo "Generated deploy-values.yaml:"
+          cat deploy-values.yaml
 
       - name: Deploy with Helm
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          TAG: ${{ needs.build-push.outputs.image_tag || github.sha }}
-          PHP_CHANGED: ${{ needs.detect-changes.outputs.php }}
-          PYTHON_CHANGED: ${{ needs.detect-changes.outputs.python }}
-          NGINX_CHANGED: ${{ needs.detect-changes.outputs.nginx }}
-          MYSQL_CHANGED: ${{ needs.detect-changes.outputs.mysql }}
-          ACM_CERT_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
-          DOMAIN: ${{ vars.DOMAIN_NAME }}
         run: |
-          echo "Deploying version: $TAG"
-          echo "ECR Registry: $ECR_REGISTRY"
-          echo "Changed services: PHP=$PHP_CHANGED, Python=$PYTHON_CHANGED, Nginx=$NGINX_CHANGED, MySQL=$MYSQL_CHANGED"
-
-          # Build Helm set arguments dynamically for changed services
-          HELM_ARGS=""
-
-          # Set ECR registry for all services (replace placeholder in values.yaml)
-          HELM_ARGS="$HELM_ARGS --set php.image.repository=$ECR_REGISTRY/${{ env.ECR_REPO_PREFIX }}/php"
-          HELM_ARGS="$HELM_ARGS --set python.image.repository=$ECR_REGISTRY/${{ env.ECR_REPO_PREFIX }}/python"
-          HELM_ARGS="$HELM_ARGS --set nginx.image.repository=$ECR_REGISTRY/${{ env.ECR_REPO_PREFIX }}/nginx"
-          HELM_ARGS="$HELM_ARGS --set mysql.image.repository=$ECR_REGISTRY/${{ env.ECR_REPO_PREFIX }}/mysql"
-
-          # Always set tags for changed services, use 'latest' for unchanged
-          if [[ "$PHP_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
-            HELM_ARGS="$HELM_ARGS --set php.image.tag=$TAG"
-          fi
-          if [[ "$PYTHON_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
-            HELM_ARGS="$HELM_ARGS --set python.image.tag=$TAG"
-          fi
-          if [[ "$NGINX_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
-            HELM_ARGS="$HELM_ARGS --set nginx.image.tag=$TAG"
-          fi
-          if [[ "$MYSQL_CHANGED" == "true" ]] || [[ "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
-            HELM_ARGS="$HELM_ARGS --set mysql.image.tag=$TAG"
-          fi
-
-          # Inject domain and certificate from secrets/variables
-          HELM_ARGS="$HELM_ARGS --set ingress.alb.certificateArn=$ACM_CERT_ARN"
-          HELM_ARGS="$HELM_ARGS --set secrets.hostName=$DOMAIN"
-          HELM_ARGS="$HELM_ARGS --set appConfig.apiBaseUrl=https://api.$DOMAIN"
-
-          # Set complete ingress host configurations (all fields required to avoid losing serviceName/port)
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].name=api"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].host=api.$DOMAIN"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].serviceName=nginx-service"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[0].port=80"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].name=admin"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].host=admin.$DOMAIN"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].serviceName=nginx-service"
-          HELM_ARGS="$HELM_ARGS --set ingress.hosts[1].port=8082"
-
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
-            $HELM_ARGS \
+            -f deploy-values.yaml \
             --timeout 5m \
             --wait
