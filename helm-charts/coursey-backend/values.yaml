@@ -4,8 +4,6 @@ secrets:
   mysqlUser: "CHANGE_ME_USERNAME"
   mysqlDatabase: "docker-php"
   mysqlPassword: "CHANGE_ME_PASSWORD"
-  pmaHost: "db"
-  hostName: "YOUR_DOMAIN" # e.g., example.com
   mailUsername: "YOUR_EMAIL" # For password reset emails
   passApp: "YOUR_APP_PASSWORD" # Gmail app password
 
