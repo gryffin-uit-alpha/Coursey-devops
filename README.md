@@ -61,11 +61,6 @@ The project utilizes **GitHub Actions** to fully automate integration and delive
    - Automatically provisions and updates AWS resources (VPC, Subnets, EKS, ALB Controller, ExternalDNS, Logs) using Terraform.
    - Enforces infrastructure changes safely via `terraform plan` on PRs and `terraform apply` on main branch merges.
 
-## 🏗 Platform Architecture
-
-This project demonstrates a hybrid DevOps platform combining cloud infrastructure and on-premise Kubernetes with GitOps automation.
-
-![DevOps Architecture](img/architecture.png)
 ---
 
 ## 📖 Deployment & Contribution Guide
