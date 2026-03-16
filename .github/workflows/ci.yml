@@ -128,6 +128,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  update-helm-tags:
+    name: Update Helm Values & Commit
+    needs: [backend-changes, backend-build]
+    if: needs.backend-changes.outputs.any_service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update tags in values.yaml using yq
+        run: |
+          SERVICES='${{ needs.backend-changes.outputs.matrix }}'
+          NEW_TAG="${{ github.sha }}"
+
+          echo "Updating image tag $NEW_TAG for services: $SERVICES"
+
+          echo "$SERVICES" | jq -r '.[]' | while read service; do
+            echo "-> Updating image tag for $service..."
+            yq -i ".${service}.image.tag = \"$NEW_TAG\"" ./helm-charts/coursey-backend/values.yaml
+          done
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add ./helm-charts/coursey-backend/values.yaml
+
+          git commit -m "chore(gitops): update image tags to $NEW_TAG [skip ci]" || echo "No changes to commit"
+          git push
+
   # --- FRONTEND CI ---
   frontend-sonar:
     name: Frontend Quality Scan

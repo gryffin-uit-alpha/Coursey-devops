@@ -44,13 +44,9 @@ jobs:
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
             --set php.image.repository="$REGISTRY/$REPO_PREFIX/php" \
-            --set php.image.tag="$TAG" \
             --set python.image.repository="$REGISTRY/$REPO_PREFIX/python" \
-            --set python.image.tag="$TAG" \
             --set nginx.image.repository="$REGISTRY/$REPO_PREFIX/nginx" \
-            --set nginx.image.tag="$TAG" \
             --set mysql.image.repository="$REGISTRY/$REPO_PREFIX/mysql" \
-            --set mysql.image.tag="$TAG" \
             --set appConfig.apiBaseUrl="https://api.$DOMAIN" \
             --set ingress.alb.certificateArn="$CERT_ARN" \
             --set secrets.mysqlRootPassword="${{ secrets.MYSQL_ROOT_PASSWORD }}" \

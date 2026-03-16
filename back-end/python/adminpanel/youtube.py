@@ -84,17 +84,27 @@ class YoububeDownloader:
             json.dump(video_info_list, f, indent=4)
             
     @staticmethod
-    def getURLList(url: str, getPlaylist_opts={"extract_flat": "in_playlist", "skip_download": True}) -> List[str]:
+    def getURLList(url: str, getPlaylist_opts=None) -> dict:
+        # Sửa lỗi Mutable Default Argument kinh điển của Python
+        if getPlaylist_opts is None:
+            getPlaylist_opts = {
+                "extract_flat": "in_playlist", 
+                "skip_download": True
+            }
+        else:
+            getPlaylist_opts = dict(getPlaylist_opts) # Create a copy
+            
+        # 1. TỐI ƯU API: Yêu cầu yt-dlp chỉ fetch tối đa 50 item đầu tiên
+        getPlaylist_opts['playlistend'] = 50
+
         # Check if cookies file exists and add it to options
         cookies_path = os.environ.get('YOUTUBE_COOKIES_PATH', '/app/cookies/youtube_cookies.txt')
         if os.path.exists(cookies_path):
-            getPlaylist_opts = dict(getPlaylist_opts)  # Create a copy
             getPlaylist_opts['cookiefile'] = cookies_path
             print(f"Using cookies from: {cookies_path}")
         else:
             print(f"Warning: Cookies file not found at {cookies_path}, proceeding without authentication")
             # Add extractor args as fallback
-            getPlaylist_opts = dict(getPlaylist_opts)
             getPlaylist_opts['extractor_args'] = {
                 'youtube': {
                     'player_client': ['android', 'web']
@@ -106,8 +116,8 @@ class YoububeDownloader:
         
         # Handle both single videos and playlists
         if "entries" in playlist_info:
-            # It's a playlist
-            videos = playlist_info["entries"]
+            # 2. TỐI ƯU CODE: Ép kiểu list và cắt đúng 50 phần tử đầu tiên (cho an toàn tuyệt đối)
+            videos = list(playlist_info["entries"])[:50]
         else:
             # It's a single video, wrap it in a list
             videos = [playlist_info]
