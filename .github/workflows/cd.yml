@@ -29,22 +29,38 @@ jobs:
       - name: Update Kubeconfig
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
-      - name: Deploy with Helm
+      - name: Deploy with Backend
         env:
-          REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          REGION: ${{ vars.AWS_REGION }}
+          REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX }}
           TAG: ${{ github.sha }}
           DOMAIN: ${{ vars.DOMAIN_NAME }}
           CERT_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
         run: |
+          # Robust Registry and Repository mapping
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+          
           helm upgrade --install coursey ./helm-charts/coursey-backend/ \
             --namespace default \
-            --set php.image.tag=$TAG \
-            --set python.image.tag=$TAG \
-            --set nginx.image.tag=$TAG \
-            --set mysql.image.tag=$TAG \
+            --set php.image.repository="$REGISTRY/$REPO_PREFIX/php" \
+            --set php.image.tag="$TAG" \
+            --set python.image.repository="$REGISTRY/$REPO_PREFIX/python" \
+            --set python.image.tag="$TAG" \
+            --set nginx.image.repository="$REGISTRY/$REPO_PREFIX/nginx" \
+            --set nginx.image.tag="$TAG" \
+            --set mysql.image.repository="$REGISTRY/$REPO_PREFIX/mysql" \
+            --set mysql.image.tag="$TAG" \
             --set appConfig.apiBaseUrl="https://api.$DOMAIN" \
             --set ingress.alb.certificateArn="$CERT_ARN" \
             --set secrets.mysqlRootPassword="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            --set secrets.mysqlUser="${{ secrets.MYSQL_USER }}" \
+            --set secrets.mysqlPassword="${{ secrets.MYSQL_PASSWORD }}" \
+            --set secrets.mailUsername="${{ secrets.MAIL_USERNAME }}" \
+            --set secrets.passApp="${{ secrets.MAIL_PASSWORD }}" \
+            --set secrets.hostName="$DOMAIN" \
+            --set ingress.hosts[0].host="api.$DOMAIN" \
+            --set ingress.hosts[1].host="admin.$DOMAIN" \
             --wait
 
   frontend-deploy:
@@ -59,16 +75,15 @@ jobs:
         with:
           name: frontend-build
           path: ./frontend-build
-          # Note: If triggered by workflow_run, download-artifact might need specific run ID. 
-          # For simplicity in this demo, it assumes artifact is available from the branch.
-          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Sync to S3
         run: aws s3 sync ./frontend-build s3://${{ vars.S3_BUCKET_NAME }} --delete
