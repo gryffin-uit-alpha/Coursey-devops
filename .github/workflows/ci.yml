@@ -91,6 +91,7 @@ jobs:
           projectBaseDir: .
           args: >
             -Dproject.settings=sonar-backend.properties
+            -Dsonar.projectKey=${{ vars.SONAR_ORG }}_Coursey-backend
             -Dsonar.organization=${{ vars.SONAR_ORG }}
 
   backend-build:
@@ -141,7 +142,10 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
         with:
           projectBaseDir: .
-          args: -Dproject.settings=sonar-frontend.properties
+          args: >
+            -Dproject.settings=sonar-frontend.properties
+            -Dsonar.projectKey=${{ vars.SONAR_ORG }}_Coursey-frontend
+            -Dsonar.organization=${{ vars.SONAR_ORG }}
 
   frontend-build:
     name: Build Frontend Artifact
