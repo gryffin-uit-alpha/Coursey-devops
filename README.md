@@ -44,22 +44,33 @@ The project leverages a robust and modern technology stack to ensure scalability
 
 The project utilizes **GitHub Actions** to fully automate integration and delivery across three distinct pipelines:
 
-1. **Backend Pipeline (`backend.yml`)**
-   - Implements intelligent path filtering (only rebuilds changed services).
-   - Runs SonarQube code quality scans.
-   - Builds Docker images via Buildx caching and scans them with Trivy.
-   - Pushes artifacts to AWS ECR.
-   - Automatically upgrades the deployment via Helm to the EKS cluster.
-
-2. **Frontend Pipeline (`frontend.yml`)**
-   - Runs SonarQube analysis for React code.
-   - Builds the optimized static bundle.
-   - Syncs static assets to a private S3 bucket.
-   - Invalidates the CloudFront CDN cache for immediate global updates.
-
-3. **Infrastructure Pipeline (`IaC.yml`)**
-   - Automatically provisions and updates AWS resources (VPC, Subnets, EKS, ALB Controller, ExternalDNS, Logs) using Terraform.
+   1. **Infrastructure Pipeline (`IaC.yml`)**
+   - Automatically provisions and updates AWS resources (VPC, Subnets, EKS, ALB Controller, ExternalDNS, CloudWatch Logs, RDS) using Terraform.
    - Enforces infrastructure changes safely via `terraform plan` on PRs and `terraform apply` on main branch merges.
+
+2. **Continuous Integration Pipeline (`ci.yml`)**
+   - Consolidated CI for both Frontend and Backend for unified quality control.
+   - **Backend:** Implements intelligent path filtering (only rebuilds changed services), utilizes Docker Buildx caching, and performs Trivy security scans.
+   - **Frontend:** Builds optimized React static bundles and uploads them as secure GitHub artifacts.
+   - **Quality Gate:** Mandatory SonarQube analysis for both Frontend and Backend codebases.
+
+3. **Continuous Deployment Pipeline (`cd.yml`)**
+   - Decoupled from CI to follow the principle of least privilege and controlled releases.
+   - **Trigger:** Automatically invoked upon successful completion of the CI pipeline on the `main` branch.
+   - **Backend:** Performs atomic `helm upgrade` to deploy microservices into the EKS cluster.
+   - **Frontend:** Downloads build artifacts from CI, syncs them to S3, and invalidates CloudFront CDN for instant global updates.
+
+---
+
+## 🛠️ Current Limitations & Future Roadmap
+
+While the current architecture is robust, there are areas identified for further optimization as the platform scales:
+
+- **Secret Management (Highest Priority):** Currently, application secrets (DB credentials, API keys) are managed via **GitHub Secrets** and injected during the CD process. To align with enterprise-grade security standards (Zero Trust), the next phase involves migrating to:
+    - **AWS Secrets Manager:** For seamless, automated rotation of RDS credentials.
+    - **HashiCorp Vault:** To implement dynamic secrets and unified secret management across cloud and on-premise environments.
+- **Auto-sharding Database:** As the user base grows, exploring RDS Aurora for automated scaling and read replicas.
+
 
 ---
 
