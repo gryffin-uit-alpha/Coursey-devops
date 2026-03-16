@@ -60,7 +60,11 @@ jobs:
             --set secrets.passApp="${{ secrets.MAIL_PASSWORD }}" \
             --set secrets.hostName="$DOMAIN" \
             --set ingress.hosts[0].host="api.$DOMAIN" \
+            --set ingress.hosts[0].serviceName="nginx-service" \
+            --set ingress.hosts[0].port=80 \
             --set ingress.hosts[1].host="admin.$DOMAIN" \
+            --set ingress.hosts[1].serviceName="nginx-service" \
+            --set ingress.hosts[1].port=8082 \
             --wait
 
   frontend-deploy:
