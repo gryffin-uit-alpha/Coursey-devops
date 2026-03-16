@@ -1,0 +1,170 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "back-end/**"
+      - "front-end/**"
+      - "helm-charts/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "back-end/**"
+      - "front-end/**"
+      - "helm-charts/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+    inputs:
+      force_rebuild_all:
+        description: "Force rebuild all backend services"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'coursey' }}
+
+jobs:
+  # --- BACKEND CI ---
+  backend-changes:
+    name: Detect Changed Backend Services
+    runs-on: ubuntu-latest
+    outputs:
+      php: ${{ steps.filter.outputs.php }}
+      python: ${{ steps.filter.outputs.python }}
+      nginx: ${{ steps.filter.outputs.nginx }}
+      mysql: ${{ steps.filter.outputs.mysql }}
+      any_service: ${{ steps.matrix.outputs.any_service }}
+      matrix: ${{ steps.matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect Changed Paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            php:    [ 'back-end/php/**', 'back-end/app/**' ]
+            python: [ 'back-end/python/**' ]
+            nginx:  [ 'back-end/nginx/**', 'back-end/app/public/**' ]
+            mysql:  [ 'back-end/mysql/**' ]
+            shared: [ 'back-end/.env*', 'back-end/docker-compose.yml', '.github/workflows/ci.yml' ]
+
+      - name: Build Dynamic Matrix
+        id: matrix
+        run: |
+          FORCE="${{ github.event.inputs.force_rebuild_all }}"
+          SHARED="${{ steps.filter.outputs.shared }}"
+          services=()
+          if [[ "$FORCE" == "true" || "$SHARED" == "true" ]]; then
+            services=("php" "python" "nginx" "mysql")
+          else
+            [[ "${{ steps.filter.outputs.php }}" == "true" ]] && services+=("php")
+            [[ "${{ steps.filter.outputs.python }}" == "true" ]] && services+=("python")
+            [[ "${{ steps.filter.outputs.nginx }}" == "true" ]] && services+=("nginx")
+            [[ "${{ steps.filter.outputs.mysql }}" == "true" ]] && services+=("mysql")
+          fi
+          if [ ${#services[@]} -eq 0 ]; then
+            echo "any_service=false" >> $GITHUB_OUTPUT
+            echo "services=[]" >> $GITHUB_OUTPUT
+          else
+            echo "any_service=true" >> $GITHUB_OUTPUT
+            echo "services=$(printf '%s\n' "${services[@]}" | jq -R . | jq -s -c .)" >> $GITHUB_OUTPUT
+          fi
+
+  backend-sonar:
+    name: Backend Quality Scan
+    needs: backend-changes
+    if: needs.backend-changes.outputs.any_service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Run SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dproject.settings=sonar-backend.properties
+            -Dsonar.organization=${{ vars.SONAR_ORG }}
+
+  backend-build:
+    name: Build & Push Backend
+    needs: [backend-changes, backend-sonar]
+    if: needs.backend-changes.outputs.any_service == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.backend-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./back-end
+          file: ./back-end/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --- FRONTEND CI ---
+  frontend-sonar:
+    name: Frontend Quality Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
+        with:
+          projectBaseDir: .
+          args: -Dproject.settings=sonar-frontend.properties
+
+  frontend-build:
+    name: Build Frontend Artifact
+    needs: frontend-sonar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: "./front-end/package-lock.json"
+      - name: Install & Build
+        working-directory: ./front-end
+        env:
+          REACT_APP_API_URL: https://api.${{ vars.DOMAIN_NAME }}/
+        run: |
+          npm ci
+          npm run build
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: front-end/build/
+          retention-days: 1

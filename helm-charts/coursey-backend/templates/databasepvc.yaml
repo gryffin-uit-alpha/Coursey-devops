@@ -10,4 +10,4 @@ spec:
   resources:
     requests:
       storage: {{ .Values.mysql.persistence.size }} 
-  storageClassName: {{ .Values.mysql.persistence.storageClass }} 
+  storageClassName: {{ .Values.mysql.persistence.storageClass }}

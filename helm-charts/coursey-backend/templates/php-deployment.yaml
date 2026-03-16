@@ -54,11 +54,6 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: PASS_APP
-        - name: HOST_NAME
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: HOST_NAME
         resources:
           {{- toYaml .Values.php.resources | nindent 10 }}
         readinessProbe:

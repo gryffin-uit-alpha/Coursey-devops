@@ -49,3 +49,4 @@ output "logs_s3_bucket" {
   description = "S3 bucket for archived logs"
   value       = module.cloudwatch_logging.s3_bucket_name
 }
+

@@ -1,0 +1,77 @@
+name: Continuous Deployment (CD)
+
+on:
+  workflow_run:
+    workflows: ["Continuous Integration (CI)"]
+    types: [completed]
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  ECR_REPO_PREFIX: ${{ vars.ECR_REPO_PREFIX || 'coursey' }}
+
+jobs:
+  backend-deploy:
+    name: Deploy Backend to EKS
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Update Kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy with Helm
+        env:
+          REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          TAG: ${{ github.sha }}
+          DOMAIN: ${{ vars.DOMAIN_NAME }}
+          CERT_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+        run: |
+          helm upgrade --install coursey ./helm-charts/coursey-backend/ \
+            --namespace default \
+            --set php.image.tag=$TAG \
+            --set python.image.tag=$TAG \
+            --set nginx.image.tag=$TAG \
+            --set mysql.image.tag=$TAG \
+            --set appConfig.apiBaseUrl="https://api.$DOMAIN" \
+            --set ingress.alb.certificateArn="$CERT_ARN" \
+            --set secrets.mysqlRootPassword="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            --wait
+
+  frontend-deploy:
+    name: Deploy Frontend to S3
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: ./frontend-build
+          # Note: If triggered by workflow_run, download-artifact might need specific run ID. 
+          # For simplicity in this demo, it assumes artifact is available from the branch.
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync to S3
+        run: aws s3 sync ./frontend-build s3://${{ vars.S3_BUCKET_NAME }} --delete
+
+      - name: Invalidate CloudFront
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
