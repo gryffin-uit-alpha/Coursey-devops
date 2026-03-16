@@ -1,6 +1,6 @@
 <?php
-    $dotenv = Dotenv\Dotenv::createImmutable("/app/.env");
-    $dotenv->load();
+    $dotenv = Dotenv\Dotenv::createImmutable("/app");
+    $dotenv->safeLoad();
 
     require_once 'connect.php';
     // require_once '../cors/cors.php';

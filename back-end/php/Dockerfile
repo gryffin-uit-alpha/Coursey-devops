@@ -12,7 +12,7 @@ FROM php:8.1-fpm-alpine
 
 # Install PHP extensions
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo pdo_mysql
+RUN install-php-extensions pdo pdo_mysql mysqli
 
 # Copy PHP configuration
 COPY php/conf.d/xdebug.ini /usr/local/etc/php/
@@ -23,9 +23,7 @@ COPY --from=composer /app/vendor /var/www/html/vendor
 # Copy application source code
 COPY app /app
 
-RUN docker-php-ext-install mysqli
-
-WORKDIR /var/www/html
+WORKDIR /app
 
 # Expose port
 EXPOSE 9000

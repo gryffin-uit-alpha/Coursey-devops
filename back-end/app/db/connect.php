@@ -2,8 +2,8 @@
 
 require_once '/var/www/html/vendor/autoload.php';
 
-$dotenv = Dotenv\Dotenv::createImmutable("/app/.env");
-$dotenv->load();
+$dotenv = Dotenv\Dotenv::createImmutable("/app");
+$dotenv->safeLoad();
 
 class Database {
     private $host;
