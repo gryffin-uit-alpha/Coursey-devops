@@ -133,6 +133,9 @@ jobs:
     needs: [backend-changes, backend-build]
     if: needs.backend-changes.outputs.any_service == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
