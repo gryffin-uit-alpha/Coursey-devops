@@ -6,12 +6,11 @@ secrets:
   mysqlPassword: "CHANGE_ME_PASSWORD"
   mailUsername: "YOUR_EMAIL" # For password reset emails
   passApp: "YOUR_APP_PASSWORD" # Gmail app password
-
 python:
   replicaCount: 1
   image:
     repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/python
-    tag: "latest"
+    tag: "23b183c2e76af0c45bdca2ed80067c4092bbbabf"
   service:
     port: 8002
   resources:
@@ -21,12 +20,11 @@ python:
     limits:
       memory: "1Gi"
       cpu: "1000m"
-
 php:
   replicaCount: 2
   image:
     repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/php
-    tag: "latest"
+    tag: "23b183c2e76af0c45bdca2ed80067c4092bbbabf"
   service:
     port: 9000
   resources:
@@ -36,12 +34,11 @@ php:
     limits:
       memory: "1Gi"
       cpu: "1000m"
-
 nginx:
   replicaCount: 1
   image:
     repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/nginx
-    tag: "latest"
+    tag: "23b183c2e76af0c45bdca2ed80067c4092bbbabf"
   service:
     # ALB target-type: ClusterIP
     type: ClusterIP
@@ -59,12 +56,11 @@ nginx:
     limits:
       memory: "256Mi"
       cpu: "500m"
-
 mysql:
   replicaCount: 1
   image:
     repository: YOUR_AWS_ACCOUNT.dkr.ecr.YOUR_REGION.amazonaws.com/coursey/mysql
-    tag: "latest"
+    tag: "23b183c2e76af0c45bdca2ed80067c4092bbbabf"
   service:
     port: 3306
   persistence:
@@ -78,10 +74,8 @@ mysql:
     limits:
       memory: "2Gi"
       cpu: "2000m"
-
 appConfig:
   apiBaseUrl: "https://api.YOUR_DOMAIN" # e.g., https://api.example.com
-
 ingress:
   enabled: true
   className: "alb"
@@ -90,18 +84,15 @@ ingress:
     scheme: "internet-facing"
     targetType: "ip"
     certificateArn: "arn:aws:acm:YOUR_REGION:YOUR_AWS_ACCOUNT:certificate/YOUR_CERTIFICATE_ID"
-
   hosts:
     - name: "api"
       host: "api.YOUR_DOMAIN" # e.g., api.example.com
       serviceName: "nginx-service"
       port: 80
-
     - name: "admin"
       host: "admin.YOUR_DOMAIN" # e.g., admin.example.com
       serviceName: "nginx-service"
       port: 8082
-
 storageClass:
   create: true
   name: gp3
